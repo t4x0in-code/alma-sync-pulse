@@ -414,13 +414,16 @@ if (TELEGRAM_TOKEN) {
 
   // Sequential /add wizard - start
   bot.onText(/^\/addwizard$/, (msg) => {
+    console.log("DEBUG: /addwizard called from", msg.chat.id);
     if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
     const chatId = String(msg.chat.id);
     addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: "", photo: "" });
     const classes = listClassesRaw();
+    console.log("DEBUG: classes found:", classes.length, classes.map(c => c.id));
     const kb = {
       inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `addw_class:${c.id}` }]),
     };
+    console.log("DEBUG: sending keyboard with", classes.length, "classes");
     bot.sendMessage(msg.chat.id, t(msg, "add_wizard_select_class"), {
       reply_markup: JSON.stringify(kb),
     });
