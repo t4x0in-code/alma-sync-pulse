@@ -17,6 +17,7 @@ import Database from "better-sqlite3";
 import TelegramBot from "node-telegram-bot-api";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
+import { createHmac, randomBytes } from "crypto";
 
 const {
   TELEGRAM_TOKEN,
@@ -26,6 +27,7 @@ const {
   DB_PATH = "/data/almalatina.db",
   CORS_ORIGIN = "*",
   MAX_PHOTO_BYTES = "800000",
+  JWT_SECRET = "insecure-dev-secret",
 } = process.env;
 
 const MAX_PHOTO = Number(MAX_PHOTO_BYTES);
@@ -33,6 +35,31 @@ const MAX_PHOTO = Number(MAX_PHOTO_BYTES);
 const adminChatIds = new Set(
   ADMIN_CHAT_IDS.split(",").map((s) => s.trim()).filter(Boolean),
 );
+
+// ---------- JWT helpers ----------
+function signAdminJwt() {
+  const exp = Date.now() + 24 * 60 * 60 * 1000;
+  const data = JSON.stringify({ role: "admin", exp });
+  const sig = createHmac("sha256", JWT_SECRET).update(data).digest("hex");
+  return Buffer.from(data).toString("base64url") + "." + sig;
+}
+function verifyAdminJwt(token) {
+  const [dataB64, sig] = token.split(".");
+  if (!dataB64 || !sig) throw new Error("malformed");
+  const data = Buffer.from(dataB64, "base64url").toString();
+  const expected = createHmac("sha256", JWT_SECRET).update(data).digest("hex");
+  if (sig !== expected) throw new Error("invalid");
+  const payload = JSON.parse(data);
+  if (payload.exp < Date.now()) throw new Error("expired");
+  return payload;
+}
+
+// ---------- Pending auth requests ----------
+const pendingAuth = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, v] of pendingAuth) if (v.expires < now) pendingAuth.delete(id);
+}, 60_000);
 
 // ---------- DB ----------
 mkdirSync(dirname(DB_PATH), { recursive: true });
@@ -399,6 +426,27 @@ if (TELEGRAM_TOKEN) {
     log(`tg:${msg.chat.id}`, "set_capacity", { id: c.id, n });
     bot.sendMessage(msg.chat.id, `📏 ${c.title}: max ${n}`);
   });
+
+  bot.on("callback_query", (q) => {
+    const [ns, action, requestId] = (q.data ?? "").split(":");
+    if (ns !== "auth") return bot.answerCallbackQuery(q.id);
+    const entry = pendingAuth.get(requestId);
+    if (!entry || entry.expires < Date.now()) {
+      pendingAuth.delete(requestId);
+      bot.answerCallbackQuery(q.id, { text: "Anfrage abgelaufen." });
+      return bot.editMessageText("⏱ Abgelaufen.", { chat_id: q.message.chat.id, message_id: q.message.message_id });
+    }
+    if (action === "ok") {
+      entry.jwt = signAdminJwt();
+      entry.status = "ok";
+      bot.answerCallbackQuery(q.id, { text: "✅ Login bestätigt!" });
+      bot.editMessageText("✅ Login bestätigt.", { chat_id: q.message.chat.id, message_id: q.message.message_id });
+    } else {
+      entry.status = "denied";
+      bot.answerCallbackQuery(q.id, { text: "❌ Abgelehnt." });
+      bot.editMessageText("❌ Login abgelehnt.", { chat_id: q.message.chat.id, message_id: q.message.message_id });
+    }
+  });
 } else {
   console.warn("⚠ TELEGRAM_TOKEN not set — bot disabled, REST API only");
 }
@@ -476,11 +524,45 @@ app.post("/api/enroll", (req, res) => {
   }
 });
 
+// Auth endpoints
+app.post("/api/auth/request", (req, res) => {
+  if (!adminChatIds.size)
+    return res.status(503).json({ error: "ADMIN_CHAT_IDS not configured" });
+  const requestId = randomBytes(8).toString("hex");
+  const pin = String(Math.floor(100000 + Math.random() * 900000));
+  pendingAuth.set(requestId, { pin, status: "pending", jwt: null, expires: Date.now() + 10 * 60 * 1000 });
+  for (const chatId of adminChatIds) {
+    bot.sendMessage(chatId,
+      `🔐 *Admin-Login angefragt*\nPIN: \`${pin}\`\n\nBestätige nur, wenn du selbst gerade einloggst.`,
+      { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[
+        { text: "✅ Bestätigen", callback_data: `auth:ok:${requestId}` },
+        { text: "❌ Ablehnen",   callback_data: `auth:deny:${requestId}` },
+      ]] } }
+    );
+  }
+  res.json({ requestId, pin });
+});
+
+app.get("/api/auth/poll/:id", (req, res) => {
+  const entry = pendingAuth.get(req.params.id);
+  if (!entry || entry.expires < Date.now()) {
+    pendingAuth.delete(req.params.id);
+    return res.json({ status: "expired" });
+  }
+  if (entry.status === "pending") return res.json({ status: "pending" });
+  const { status, jwt } = entry;
+  pendingAuth.delete(req.params.id);
+  res.json({ status, ...(jwt ? { token: jwt } : {}) });
+});
+
 // Admin guard
 app.use("/api/admin", (req, res, next) => {
-  if (req.headers["x-admin-token"] !== ADMIN_TOKEN)
-    return res.status(401).json({ error: "unauthorized" });
-  next();
+  const t = req.headers["x-admin-token"];
+  if (t) {
+    try { verifyAdminJwt(t); return next(); } catch (_) {}
+    if (t === ADMIN_TOKEN) return next();  // legacy fallback
+  }
+  return res.status(401).json({ error: "unauthorized" });
 });
 
 // --- Class CRUD ---

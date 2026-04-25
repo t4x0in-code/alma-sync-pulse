@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -24,17 +24,87 @@ export const Route = createFileRoute("/tony-admin")({
   component: TonyAdmin,
 });
 
+const API_BASE = (import.meta.env.VITE_BOT_API_URL as string | undefined) ?? "";
+
 function TonyAdmin() {
   const { classes, live, reload } = useClasses(3000);
   const [token, setToken] = useState(
-    () =>
-      (typeof window !== "undefined" && localStorage.getItem("admin_token")) || "",
+    () => (typeof window !== "undefined" && localStorage.getItem("admin_token")) || "",
   );
+  const [loginState, setLoginState] = useState<"idle" | "requesting" | "waiting" | "error">("idle");
+  const [loginData, setLoginData] = useState<{ requestId: string; pin: string } | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const saveToken = (t: string) => {
     setToken(t);
     if (typeof window !== "undefined") localStorage.setItem("admin_token", t);
   };
+
+  const requestLogin = async () => {
+    setLoginState("requesting");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/request`, { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      const { requestId, pin } = await res.json();
+      setLoginData({ requestId, pin });
+      setLoginState("waiting");
+      pollRef.current = setInterval(async () => {
+        try {
+          const r = await fetch(`${API_BASE}/api/auth/poll/${requestId}`);
+          const data = await r.json();
+          if (data.status === "ok") {
+            clearInterval(pollRef.current!);
+            saveToken(data.token);
+            setLoginState("idle");
+          } else if (data.status === "denied" || data.status === "expired") {
+            clearInterval(pollRef.current!);
+            setLoginState("error");
+            toast.error(data.status === "denied" ? "Login abgelehnt." : "Anfrage abgelaufen.");
+          }
+        } catch { /* network hiccup, keep polling */ }
+      }, 2000);
+    } catch {
+      setLoginState("error");
+      toast.error("Login-Anfrage fehlgeschlagen.");
+    }
+  };
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  if (!token) return (
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader />
+      <main className="flex flex-1 items-center justify-center p-6">
+        <Card className="w-full max-w-sm p-8 flex flex-col gap-6">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-xl font-semibold">Admin-Anmeldung</h1>
+            <p className="text-sm text-muted-foreground">Bestätige den Login über Telegram.</p>
+          </div>
+          {loginState === "waiting" && loginData ? (
+            <div className="flex flex-col gap-3 text-center">
+              <p className="text-sm text-muted-foreground">PIN zur Bestätigung:</p>
+              <p className="text-4xl font-mono font-bold tracking-widest">{loginData.pin}</p>
+              <p className="text-sm text-muted-foreground animate-pulse">Warte auf Bestätigung in Telegram…</p>
+              <Button variant="ghost" size="sm" onClick={() => { clearInterval(pollRef.current!); setLoginState("idle"); }}>
+                Abbrechen
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={requestLogin} disabled={loginState === "requesting"}>
+              {loginState === "requesting" ? "Anfrage wird gesendet…" : "Mit Telegram anmelden"}
+            </Button>
+          )}
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs text-muted-foreground">Oder Token manuell eingeben</Label>
+            <Input type="password" placeholder="admin token"
+              onBlur={(e) => { if (e.target.value) saveToken(e.target.value); }} />
+          </div>
+        </Card>
+      </main>
+      <SiteFooter />
+      <Toaster />
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -57,22 +127,6 @@ function TonyAdmin() {
           </Button>
         </div>
 
-        <Card className="mb-6 p-4">
-          <Label
-            htmlFor="token"
-            className="text-xs uppercase tracking-widest text-muted-foreground"
-          >
-            Admin Token (X-Admin-Token)
-          </Label>
-          <Input
-            id="token"
-            type="password"
-            value={token}
-            onChange={(e) => saveToken(e.target.value)}
-            placeholder="Aus .env des Bots: ADMIN_TOKEN"
-            className="mt-2"
-          />
-        </Card>
 
         <div className="space-y-8">
           {classes.map((k) => (
