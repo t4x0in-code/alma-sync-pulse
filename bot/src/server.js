@@ -18,7 +18,7 @@ import TelegramBot from "node-telegram-bot-api";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 import { createHmac, randomBytes } from "crypto";
-import { t, lang } from "./i18n.js";
+import { t, lang, initI18n } from "./i18n.js";
 
 const {
   TELEGRAM_TOKEN,
@@ -34,7 +34,9 @@ const {
 const MAX_PHOTO = Number(MAX_PHOTO_BYTES);
 
 const adminChatIds = new Set(
-  ADMIN_CHAT_IDS.split(",").map((s) => s.trim()).filter(Boolean),
+  ADMIN_CHAT_IDS.split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 );
 
 // ---------- JWT helpers ----------
@@ -62,8 +64,14 @@ setInterval(() => {
   for (const [id, v] of pendingAuth) if (v.expires < now) pendingAuth.delete(id);
 }, 60_000);
 
-// Stores language code per admin chat ID (populated on /start)
+// Stores language code per admin chat ID (populated on /lang)
 const adminLangs = new Map();
+
+// Re-export for i18n module
+export { adminLangs };
+
+// Initialize i18n with adminLangs Map
+initI18n(adminLangs);
 
 // ---------- DB ----------
 mkdirSync(dirname(DB_PATH), { recursive: true });
@@ -130,12 +138,14 @@ try {
   }
   const ecols = db.prepare("PRAGMA table_info(enrollments)").all();
   const has = (n) => ecols.some((c) => c.name === n);
-  if (!has("gender")) db.exec("ALTER TABLE enrollments ADD COLUMN gender TEXT NOT NULL DEFAULT 'L'");
+  if (!has("gender"))
+    db.exec("ALTER TABLE enrollments ADD COLUMN gender TEXT NOT NULL DEFAULT 'L'");
   if (!has("age")) db.exec("ALTER TABLE enrollments ADD COLUMN age INTEGER");
   if (!has("photo")) db.exec("ALTER TABLE enrollments ADD COLUMN photo TEXT");
   if (!has("comment")) db.exec("ALTER TABLE enrollments ADD COLUMN comment TEXT");
   if (!has("looking_for")) db.exec("ALTER TABLE enrollments ADD COLUMN looking_for TEXT");
-  if (!has("source")) db.exec("ALTER TABLE enrollments ADD COLUMN source TEXT NOT NULL DEFAULT 'web'");
+  if (!has("source"))
+    db.exec("ALTER TABLE enrollments ADD COLUMN source TEXT NOT NULL DEFAULT 'web'");
 } catch (e) {
   console.warn("Migration warning:", e.message);
 }
@@ -176,9 +186,7 @@ if (seedR.n === 0) {
 
 const log = (actor, action, payload) =>
   db
-    .prepare(
-      "INSERT INTO admin_logs (actor,action,payload,created_at) VALUES (?,?,?,?)",
-    )
+    .prepare("INSERT INTO admin_logs (actor,action,payload,created_at) VALUES (?,?,?,?)")
     .run(actor, action, payload ? JSON.stringify(payload) : null, Date.now());
 
 // ---------- Helpers ----------
@@ -260,25 +268,85 @@ if (TELEGRAM_TOKEN) {
   bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
   console.log("✓ Telegram bot started (polling)");
 
-  const isAdmin = (msg) =>
-    adminChatIds.size === 0 || adminChatIds.has(String(msg.chat.id));
+  // Register commands in bot menu
+  bot.setMyCommands([
+    { command: "start", description: "Start bot" },
+    { command: "status", description: "Class overview" },
+    { command: "list", description: "List enrollments" },
+    { command: "lang", description: "Change language" },
+    { command: "add", description: "Add enrollment" },
+    { command: "del", description: "Delete enrollment" },
+    { command: "match", description: "Propose pair" },
+    { command: "confirm", description: "Confirm pair" },
+    { command: "unpair", description: "Remove pair" },
+    { command: "reserved", description: "List reserved" },
+    { command: "add_reserved", description: "Add reserved" },
+    { command: "del_reserved", description: "Delete reserved" },
+    { command: "block", description: "Close class" },
+    { command: "open", description: "Open class" },
+    { command: "add_spot", description: "Add spot" },
+    { command: "set_capacity", description: "Set capacity" },
+  ]);
+
+  const isAdmin = (msg) => adminChatIds.size === 0 || adminChatIds.has(String(msg.chat.id));
 
   bot.onText(/^\/start/, (msg) => {
     const l = lang(msg.from);
     adminLangs.set(String(msg.chat.id), l);
-    bot.sendMessage(msg.chat.id, t(l, "start", { chatId: msg.chat.id }), { parse_mode: "Markdown" });
+    bot.sendMessage(msg.chat.id, t(msg, "start", { chatId: msg.chat.id }), {
+      parse_mode: "Markdown",
+    });
+  });
+
+  // Language chooser
+  bot.onText(/^\/lang/, (msg) => {
+    const kb = {
+      inline_keyboard: [
+        [
+          { text: "🇬🇧 English", callback_data: "lang:en" },
+          { text: "🇩🇪 Deutsch", callback_data: "lang:de" },
+        ],
+        [
+          { text: "🇷🇺 Русский", callback_data: "lang:ru" },
+          { text: "🇺🇦 Українська", callback_data: "lang:uk" },
+        ],
+        [
+          { text: "🇫🇷 Français", callback_data: "lang:fr" },
+          { text: "🇹🇷 Türkçe", callback_data: "lang:tr" },
+        ],
+        [
+          { text: "🇮🇹 Italiano", callback_data: "lang:it" },
+          { text: "🇪🇸 Español", callback_data: "lang:es" },
+        ],
+      ],
+    };
+    bot.sendMessage(msg.chat.id, t(msg, "choose_lang"), {
+      reply_markup: JSON.stringify(kb),
+    });
   });
 
   bot.onText(/^\/status/, (msg) => {
     const l = lang(msg.from);
-    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(l, "no_access"));
+    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
     const rows = listClasses();
-    if (!rows.length) return bot.sendMessage(msg.chat.id, t(l, "no_courses"));
+    if (!rows.length) return bot.sendMessage(msg.chat.id, t(msg, "no_courses"));
     const txt = rows
       .map((c) => {
         const confirmed = c.pairs.filter((p) => p.status === "confirmed").length;
         const proposed = c.pairs.filter((p) => p.status === "proposed").length;
-        return t(l, "status_line", { title: c.title, id: c.id, schedule: c.schedule, enrolled: c.current_enrollment, cap: c.max_capacity, status: c.status, f: c.counts_by_gender.F, l: c.counts_by_gender.L, confirmed, proposed, reserved: c.reserved.length });
+        return t(msg, "status_line", {
+          title: c.title,
+          id: c.id,
+          schedule: c.schedule,
+          enrolled: c.current_enrollment,
+          cap: c.max_capacity,
+          status: c.status,
+          f: c.counts_by_gender.F,
+          l: c.counts_by_gender.L,
+          confirmed,
+          proposed,
+          reserved: c.reserved.length,
+        });
       })
       .join("\n\n");
     bot.sendMessage(msg.chat.id, txt, { parse_mode: "Markdown" });
@@ -292,20 +360,40 @@ if (TELEGRAM_TOKEN) {
     return true;
   };
 
-  bot.onText(/^\/list\s+(\S+)/, (msg, m) => {
+  bot.onText(/^\/list(?:\s+(\S+))?$/, (msg, m) => {
     if (!guard(msg)) return;
     const l = lang(msg.from);
-    const c = getClass(m[1]);
-    if (!c) return bot.sendMessage(msg.chat.id, t(l, "course_not_found"));
-    const en = listEnrollments(c.id);
-    if (!en.length) return bot.sendMessage(msg.chat.id, t(l, "no_enrollments"));
-    const txt = en
-      .map(
-        (r) =>
-          `#${r.id} ${r.gender === "L" ? "🕺" : "💃"} *${r.name}*${r.age ? `, ${r.age}` : ""}${r.comment ? `\n   _${r.comment}_` : ""}`,
-      )
-      .join("\n");
-    bot.sendMessage(msg.chat.id, `*${c.title}*\n${txt}`, { parse_mode: "Markdown" });
+    const classIdArg = m[1];
+    const classes = listClassesRaw();
+
+    const sendEnrollmentList = (c) => {
+      const en = listEnrollments(c.id);
+      if (!en.length) return bot.sendMessage(msg.chat.id, t(msg, "no_enrollments"));
+      const txt = en
+        .map(
+          (r) =>
+            `#${r.id} ${r.gender === "L" ? "🕺" : "💃"} *${r.name}*${r.age ? `, ${r.age}` : ""}${r.comment ? `\n   _${r.comment}_` : ""}`,
+        )
+        .join("\n");
+      bot.sendMessage(msg.chat.id, `*${c.title}*\n${txt}`, { parse_mode: "Markdown" });
+    };
+
+    if (classIdArg) {
+      const c = getClass(classIdArg);
+      if (!c) return bot.sendMessage(msg.chat.id, t(msg, "course_not_found"));
+      return sendEnrollmentList(c);
+    }
+
+    if (classes.length === 1) {
+      return sendEnrollmentList(classes[0]);
+    }
+
+    const kb = {
+      inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `list_class:${c.id}` }]),
+    };
+    bot.sendMessage(msg.chat.id, t(msg, "select_class"), {
+      reply_markup: JSON.stringify(kb),
+    });
   });
 
   bot.onText(/^\/add\s+(\S+)\s+(L|F)\s+(.+?)(?:\s+(\d{1,3}))?$/i, (msg, m) => {
@@ -313,14 +401,21 @@ if (TELEGRAM_TOKEN) {
     const l = lang(msg.from);
     const [, classId, g, name, age] = m;
     const c = getClass(classId);
-    if (!c) return bot.sendMessage(msg.chat.id, t(l, "course_not_found"));
+    if (!c) return bot.sendMessage(msg.chat.id, t(msg, "course_not_found"));
     const r = db
       .prepare(
         "INSERT INTO enrollments (class_id,name,gender,age,source,created_at) VALUES (?,?,?,?,?,?)",
       )
-      .run(classId, name.trim(), g.toUpperCase(), age ? Number(age) : null, `tg:${msg.chat.id}`, Date.now());
+      .run(
+        classId,
+        name.trim(),
+        g.toUpperCase(),
+        age ? Number(age) : null,
+        `tg:${msg.chat.id}`,
+        Date.now(),
+      );
     log(`tg:${msg.chat.id}`, "add_enrollment", { classId, id: r.lastInsertRowid });
-    bot.sendMessage(msg.chat.id, t(l, "added", { id: r.lastInsertRowid }));
+    bot.sendMessage(msg.chat.id, t(msg, "added", { id: r.lastInsertRowid }));
   });
 
   bot.onText(/^\/del\s+(\d+)/, (msg, m) => {
@@ -330,7 +425,7 @@ if (TELEGRAM_TOKEN) {
     db.prepare("DELETE FROM pairs WHERE leader_id=? OR follower_id=?").run(id, id);
     const r = db.prepare("DELETE FROM enrollments WHERE id=?").run(id);
     log(`tg:${msg.chat.id}`, "del_enrollment", { id });
-    bot.sendMessage(msg.chat.id, r.changes ? t(l, "deleted", { id }) : t(l, "not_found"));
+    bot.sendMessage(msg.chat.id, r.changes ? t(msg, "deleted", { id }) : t(msg, "not_found"));
   });
 
   bot.onText(/^\/match\s+(\d+)\s+(\d+)/, (msg, m) => {
@@ -338,11 +433,11 @@ if (TELEGRAM_TOKEN) {
     const l = lang(msg.from);
     const a = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[1]));
     const b = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[2]));
-    if (!a || !b) return bot.sendMessage(msg.chat.id, t(l, "enrollment_not_found"));
-    if (a.class_id !== b.class_id) return bot.sendMessage(msg.chat.id, t(l, "different_courses"));
+    if (!a || !b) return bot.sendMessage(msg.chat.id, t(msg, "enrollment_not_found"));
+    if (a.class_id !== b.class_id) return bot.sendMessage(msg.chat.id, t(msg, "different_courses"));
     const leader = a.gender === "L" ? a : b.gender === "L" ? b : null;
     const follower = a.gender === "F" ? a : b.gender === "F" ? b : null;
-    if (!leader || !follower) return bot.sendMessage(msg.chat.id, t(l, "need_l_f"));
+    if (!leader || !follower) return bot.sendMessage(msg.chat.id, t(msg, "need_l_f"));
     try {
       const r = db
         .prepare(
@@ -350,10 +445,17 @@ if (TELEGRAM_TOKEN) {
         )
         .run(a.class_id, leader.id, follower.id, "proposed", Date.now());
       log(`tg:${msg.chat.id}`, "match", { id: r.lastInsertRowid });
-      bot.sendMessage(msg.chat.id, t(l, "pair_proposed", { id: r.lastInsertRowid, leader: leader.name, follower: follower.name }));
+      bot.sendMessage(
+        msg.chat.id,
+        t(msg, "pair_proposed", {
+          id: r.lastInsertRowid,
+          leader: leader.name,
+          follower: follower.name,
+        }),
+      );
     } catch (e) {
       console.error("match error:", e.message);
-      bot.sendMessage(msg.chat.id, t(l, "db_error"));
+      bot.sendMessage(msg.chat.id, t(msg, "db_error"));
     }
   });
 
@@ -362,7 +464,10 @@ if (TELEGRAM_TOKEN) {
     const l = lang(msg.from);
     const r = db.prepare("UPDATE pairs SET status='confirmed' WHERE id=?").run(Number(m[1]));
     log(`tg:${msg.chat.id}`, "confirm_pair", { id: Number(m[1]) });
-    bot.sendMessage(msg.chat.id, r.changes ? t(l, "pair_confirmed", { id: m[1] }) : t(l, "pair_not_found"));
+    bot.sendMessage(
+      msg.chat.id,
+      r.changes ? t(msg, "pair_confirmed", { id: m[1] }) : t(msg, "pair_not_found"),
+    );
   });
 
   bot.onText(/^\/unpair\s+(\d+)/, (msg, m) => {
@@ -370,17 +475,24 @@ if (TELEGRAM_TOKEN) {
     const l = lang(msg.from);
     const r = db.prepare("DELETE FROM pairs WHERE id=?").run(Number(m[1]));
     log(`tg:${msg.chat.id}`, "unpair", { id: Number(m[1]) });
-    bot.sendMessage(msg.chat.id, r.changes ? t(l, "pair_deleted", { id: m[1] }) : t(l, "pair_not_found"));
+    bot.sendMessage(
+      msg.chat.id,
+      r.changes ? t(msg, "pair_deleted", { id: m[1] }) : t(msg, "pair_not_found"),
+    );
   });
 
   bot.onText(/^\/reserved\s+(\S+)/, (msg, m) => {
     if (!guard(msg)) return;
     const l = lang(msg.from);
     const rows = listReserved(m[1]);
-    if (!rows.length) return bot.sendMessage(msg.chat.id, t(l, "no_reserved"));
+    if (!rows.length) return bot.sendMessage(msg.chat.id, t(msg, "no_reserved"));
     bot.sendMessage(
       msg.chat.id,
-      rows.map((r) => `#${r.id} 🔒 ${r.leader_nick}–${r.follower_nick}${r.note ? ` · ${r.note}` : ""}`).join("\n"),
+      rows
+        .map(
+          (r) => `#${r.id} 🔒 ${r.leader_nick}–${r.follower_nick}${r.note ? ` · ${r.note}` : ""}`,
+        )
+        .join("\n"),
     );
   });
 
@@ -395,10 +507,17 @@ if (TELEGRAM_TOKEN) {
         )
         .run(classId, lNick.toUpperCase(), f.toUpperCase(), note || null);
       log(`tg:${msg.chat.id}`, "add_reserved", { id: r.lastInsertRowid });
-      bot.sendMessage(msg.chat.id, t(l, "reserved_added", { id: r.lastInsertRowid, l: lNick.toUpperCase(), f: f.toUpperCase() }));
+      bot.sendMessage(
+        msg.chat.id,
+        t(msg, "reserved_added", {
+          id: r.lastInsertRowid,
+          l: lNick.toUpperCase(),
+          f: f.toUpperCase(),
+        }),
+      );
     } catch (e) {
       console.error("add_reserved error:", e.message);
-      bot.sendMessage(msg.chat.id, t(l, "db_error"));
+      bot.sendMessage(msg.chat.id, t(msg, "db_error"));
     }
   });
 
@@ -407,7 +526,10 @@ if (TELEGRAM_TOKEN) {
     const l = lang(msg.from);
     const r = db.prepare("DELETE FROM reserved_pairs WHERE id=?").run(Number(m[1]));
     log(`tg:${msg.chat.id}`, "del_reserved", { id: Number(m[1]) });
-    bot.sendMessage(msg.chat.id, r.changes ? t(l, "reserved_deleted", { id: m[1] }) : t(l, "not_found"));
+    bot.sendMessage(
+      msg.chat.id,
+      r.changes ? t(msg, "reserved_deleted", { id: m[1] }) : t(msg, "not_found"),
+    );
   });
 
   // Class admin
@@ -415,7 +537,8 @@ if (TELEGRAM_TOKEN) {
     bot.onText(re, (msg, m) => {
       if (!guard(msg)) return;
       const c = getClass(m[1]);
-      if (!c) return bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_not_found_id", { id: m[1] }));
+      if (!c)
+        return bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_not_found_id", { id: m[1] }));
       fn(msg, c, m);
     });
 
@@ -432,7 +555,10 @@ if (TELEGRAM_TOKEN) {
   cmdWithId(/^\/add_spot\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET max_capacity=max_capacity+1 WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "add_spot", { id: c.id });
-    bot.sendMessage(msg.chat.id, t(lang(msg.from), "spot_added", { title: c.title, n: c.max_capacity + 1 }));
+    bot.sendMessage(
+      msg.chat.id,
+      t(lang(msg.from), "spot_added", { title: c.title, n: c.max_capacity + 1 }),
+    );
   });
   cmdWithId(/^\/set_capacity\s+(\S+)\s+(\d+)/, (msg, c, m) => {
     const n = parseInt(m[2], 10);
@@ -442,24 +568,71 @@ if (TELEGRAM_TOKEN) {
   });
 
   bot.on("callback_query", (q) => {
-    const l = lang(q.from);
     const [ns, action, requestId] = (q.data ?? "").split(":");
+
+    if (ns === "list_class") {
+      const c = getClass(action);
+      if (!c) return bot.answerCallbackQuery(q.id, { text: t(q, "course_not_found") });
+      const en = listEnrollments(c.id);
+      const txt = en
+        .map(
+          (r) =>
+            `#${r.id} ${r.gender === "L" ? "🕺" : "💃"} *${r.name}*${r.age ? `, ${r.age}` : ""}${r.comment ? `\n   _${r.comment}_` : ""}`,
+        )
+        .join("\n");
+      bot.answerCallbackQuery(q.id);
+      return bot.editMessageText(`*${c.title}*\n${txt}`, {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+        parse_mode: "Markdown",
+      });
+    }
+
+    if (ns === "lang") {
+      const newLang = action;
+      adminLangs.set(String(q.message.chat.id), newLang);
+      const langNames = {
+        en: "English",
+        de: "Deutsch",
+        ru: "Русский",
+        uk: "Українська",
+        fr: "Français",
+        tr: "Türkçe",
+        it: "Italiano",
+        es: "Español",
+      };
+      bot.answerCallbackQuery(q.id, { text: t(q, "lang_changed") });
+      return bot.editMessageText(t(q, "lang_selected", { lang: langNames[newLang] ?? newLang }), {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+      });
+    }
+
     if (ns !== "auth") return bot.answerCallbackQuery(q.id);
     const entry = pendingAuth.get(requestId);
     if (!entry || entry.expires < Date.now()) {
       pendingAuth.delete(requestId);
-      bot.answerCallbackQuery(q.id, { text: t(l, "auth_expired_cb") });
-      return bot.editMessageText(t(l, "auth_expired_msg"), { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      bot.answerCallbackQuery(q.id, { text: t(q, "auth_expired_cb") });
+      return bot.editMessageText(t(q, "auth_expired_msg"), {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+      });
     }
     if (action === "ok") {
       entry.jwt = signAdminJwt();
       entry.status = "ok";
-      bot.answerCallbackQuery(q.id, { text: t(l, "auth_confirmed_cb") });
-      bot.editMessageText(t(l, "auth_confirmed_msg"), { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      bot.answerCallbackQuery(q.id, { text: t(q, "auth_confirmed_cb") });
+      bot.editMessageText(t(q, "auth_confirmed_msg"), {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+      });
     } else {
       entry.status = "denied";
-      bot.answerCallbackQuery(q.id, { text: t(l, "auth_denied_cb") });
-      bot.editMessageText(t(l, "auth_denied_msg"), { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      bot.answerCallbackQuery(q.id, { text: t(q, "auth_denied_cb") });
+      bot.editMessageText(t(q, "auth_denied_msg"), {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+      });
     }
   });
 } else {
@@ -532,14 +705,16 @@ app.post("/api/enroll", (req, res) => {
       );
 
     log("web", "enroll", { class_id, id: r.lastInsertRowid });
-    notifyAdmins((al) => t(al, "notify_enroll", {
-      role: gender === "L" ? "🕺 Leader" : "💃 Follower",
-      name,
-      age: age ? `, ${age}` : "",
-      comment: comment ? `\n_${comment}_` : "",
-      title: c.title,
-      id: r.lastInsertRowid,
-    }));
+    notifyAdmins((al) =>
+      t(al, "notify_enroll", {
+        role: gender === "L" ? "🕺 Leader" : "💃 Follower",
+        name,
+        age: age ? `, ${age}` : "",
+        comment: comment ? `\n_${comment}_` : "",
+        title: c.title,
+        id: r.lastInsertRowid,
+      }),
+    );
     res.json({ ok: true, enrollment_id: r.lastInsertRowid, class: enrichClass(c) });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -548,20 +723,30 @@ app.post("/api/enroll", (req, res) => {
 
 // Auth endpoints
 app.post("/api/auth/request", (req, res) => {
-  if (!adminChatIds.size)
-    return res.status(503).json({ error: "ADMIN_CHAT_IDS not configured" });
+  if (!adminChatIds.size) return res.status(503).json({ error: "ADMIN_CHAT_IDS not configured" });
   const requestId = randomBytes(8).toString("hex");
   const pin = String(Math.floor(100000 + Math.random() * 900000));
-  pendingAuth.set(requestId, { pin, status: "pending", jwt: null, expires: Date.now() + 10 * 60 * 1000 });
+  pendingAuth.set(requestId, {
+    pin,
+    status: "pending",
+    jwt: null,
+    expires: Date.now() + 10 * 60 * 1000,
+  });
   for (const chatId of adminChatIds) {
     const al = adminLangs.get(chatId) ?? "en";
-    bot.sendMessage(chatId,
-      t(al, "auth_request", { pin }),
-      { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[
-        { text: t(al, "auth_confirm_btn"), callback_data: `auth:ok:${requestId}` },
-        { text: t(al, "auth_deny_btn"),   callback_data: `auth:deny:${requestId}` },
-      ]] } }
-    ).catch(() => {});
+    bot
+      .sendMessage(chatId, t(al, "auth_request", { pin }), {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: t(al, "auth_confirm_btn"), callback_data: `auth:ok:${requestId}` },
+              { text: t(al, "auth_deny_btn"), callback_data: `auth:deny:${requestId}` },
+            ],
+          ],
+        },
+      })
+      .catch(() => {});
   }
   res.json({ requestId, pin });
 });
@@ -582,8 +767,11 @@ app.get("/api/auth/poll/:id", (req, res) => {
 app.use("/api/admin", (req, res, next) => {
   const t = req.headers["x-admin-token"];
   if (t) {
-    try { verifyAdminJwt(t); return next(); } catch (_) {}
-    if (t === ADMIN_TOKEN) return next();  // legacy fallback
+    try {
+      verifyAdminJwt(t);
+      return next();
+    } catch (_) {}
+    if (t === ADMIN_TOKEN) return next(); // legacy fallback
   }
   return res.status(401).json({ error: "unauthorized" });
 });
@@ -592,24 +780,43 @@ app.use("/api/admin", (req, res, next) => {
 app.patch("/api/admin/classes/:id", (req, res) => {
   const c = getClass(req.params.id);
   if (!c) return res.status(404).json({ error: "not found" });
-  const allowed = ["title", "instructor", "schedule", "max_capacity", "status", "external_url", "description"];
+  const allowed = [
+    "title",
+    "instructor",
+    "schedule",
+    "max_capacity",
+    "status",
+    "external_url",
+    "description",
+  ];
   const patch = {};
   for (const k of allowed) if (k in req.body) patch[k] = req.body[k];
   if (!Object.keys(patch).length) return res.status(400).json({ error: "no fields" });
-  const sets = Object.keys(patch).map((k) => `${k}=?`).join(",");
+  const sets = Object.keys(patch)
+    .map((k) => `${k}=?`)
+    .join(",");
   db.prepare(`UPDATE classes SET ${sets} WHERE id=?`).run(...Object.values(patch), c.id);
   log("admin", "patch_class", { id: c.id, patch });
   res.json(enrichClass(getClass(c.id)));
 });
 
 app.post("/api/admin/classes", (req, res) => {
-  const { id, title, instructor, schedule, max_capacity, external_url, description } = req.body || {};
+  const { id, title, instructor, schedule, max_capacity, external_url, description } =
+    req.body || {};
   if (!id || !title) return res.status(400).json({ error: "id, title required" });
   try {
     db.prepare(
       `INSERT INTO classes (id,title,instructor,schedule,max_capacity,status,external_url,description)
        VALUES (?,?,?,?,?,'open',?,?)`,
-    ).run(id, title, instructor || "Tony", schedule || "TBD", max_capacity || 20, external_url || "https://almalatina.de/", description || null);
+    ).run(
+      id,
+      title,
+      instructor || "Tony",
+      schedule || "TBD",
+      max_capacity || 20,
+      external_url || "https://almalatina.de/",
+      description || null,
+    );
     log("admin", "create_class", { id });
     res.json(enrichClass(getClass(id)));
   } catch (e) {
@@ -630,7 +837,8 @@ app.delete("/api/admin/classes/:id", (req, res) => {
 app.post("/api/admin/enrollments", (req, res) => {
   try {
     const { class_id, name, gender, age, email, phone, photo, comment } = req.body || {};
-    if (!class_id || !name || !gender) return res.status(400).json({ error: "class_id, name, gender required" });
+    if (!class_id || !name || !gender)
+      return res.status(400).json({ error: "class_id, name, gender required" });
     if (gender !== "L" && gender !== "F") return res.status(400).json({ error: "invalid gender" });
     const cleanPhoto = validatePhoto(photo);
     const r = db
@@ -638,7 +846,18 @@ app.post("/api/admin/enrollments", (req, res) => {
         `INSERT INTO enrollments (class_id,name,gender,age,email,phone,photo,comment,source,created_at)
          VALUES (?,?,?,?,?,?,?,?,?,?)`,
       )
-      .run(class_id, name.trim(), gender, age ?? null, email || null, phone || null, cleanPhoto, comment || null, "admin", Date.now());
+      .run(
+        class_id,
+        name.trim(),
+        gender,
+        age ?? null,
+        email || null,
+        phone || null,
+        cleanPhoto,
+        comment || null,
+        "admin",
+        Date.now(),
+      );
     log("admin", "add_enrollment", { id: r.lastInsertRowid });
     res.json({ ok: true, id: r.lastInsertRowid, class: enrichClass(getClass(class_id)) });
   } catch (e) {
@@ -657,7 +876,9 @@ app.patch("/api/admin/enrollments/:id", (req, res) => {
     return res.status(400).json({ error: "invalid gender" });
   if (patch.photo !== undefined) patch.photo = validatePhoto(patch.photo);
   if (!Object.keys(patch).length) return res.status(400).json({ error: "no fields" });
-  const sets = Object.keys(patch).map((k) => `${k}=?`).join(",");
+  const sets = Object.keys(patch)
+    .map((k) => `${k}=?`)
+    .join(",");
   db.prepare(`UPDATE enrollments SET ${sets} WHERE id=?`).run(...Object.values(patch), id);
   log("admin", "patch_enrollment", { id, patch });
   res.json({ ok: true, class: enrichClass(getClass(cur.class_id)) });
@@ -681,9 +902,12 @@ app.post("/api/admin/pairs", (req, res) => {
     const b = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(follower_id));
     if (!a || !b) return res.status(404).json({ error: "enrollment not found" });
     if (a.class_id !== b.class_id) return res.status(400).json({ error: "different classes" });
-    if (a.gender !== "L" || b.gender !== "F") return res.status(400).json({ error: "leader_id must be L, follower_id must be F" });
+    if (a.gender !== "L" || b.gender !== "F")
+      return res.status(400).json({ error: "leader_id must be L, follower_id must be F" });
     const r = db
-      .prepare("INSERT INTO pairs (class_id,leader_id,follower_id,status,created_at) VALUES (?,?,?,?,?)")
+      .prepare(
+        "INSERT INTO pairs (class_id,leader_id,follower_id,status,created_at) VALUES (?,?,?,?,?)",
+      )
       .run(a.class_id, a.id, b.id, status === "confirmed" ? "confirmed" : "proposed", Date.now());
     log("admin", "create_pair", { id: r.lastInsertRowid });
     res.json({ ok: true, id: r.lastInsertRowid, class: enrichClass(getClass(a.class_id)) });
@@ -697,7 +921,8 @@ app.patch("/api/admin/pairs/:id", (req, res) => {
   const cur = db.prepare("SELECT * FROM pairs WHERE id=?").get(id);
   if (!cur) return res.status(404).json({ error: "not found" });
   const { status } = req.body || {};
-  if (status !== "proposed" && status !== "confirmed") return res.status(400).json({ error: "invalid status" });
+  if (status !== "proposed" && status !== "confirmed")
+    return res.status(400).json({ error: "invalid status" });
   db.prepare("UPDATE pairs SET status=? WHERE id=?").run(status, id);
   log("admin", "patch_pair", { id, status });
   res.json({ ok: true, class: enrichClass(getClass(cur.class_id)) });
@@ -716,11 +941,14 @@ app.delete("/api/admin/pairs/:id", (req, res) => {
 app.post("/api/admin/reserved", (req, res) => {
   try {
     const { class_id, leader_nick, follower_nick, note } = req.body || {};
-    if (!class_id || !leader_nick || !follower_nick) return res.status(400).json({ error: "missing fields" });
+    if (!class_id || !leader_nick || !follower_nick)
+      return res.status(400).json({ error: "missing fields" });
     if (!/^[A-Za-z]{2}$/.test(leader_nick) || !/^[A-Za-z]{2}$/.test(follower_nick))
       return res.status(400).json({ error: "nicks must be 2 letters" });
     const r = db
-      .prepare("INSERT INTO reserved_pairs (class_id,leader_nick,follower_nick,note) VALUES (?,?,?,?)")
+      .prepare(
+        "INSERT INTO reserved_pairs (class_id,leader_nick,follower_nick,note) VALUES (?,?,?,?)",
+      )
       .run(class_id, leader_nick.toUpperCase(), follower_nick.toUpperCase(), note || null);
     log("admin", "add_reserved", { id: r.lastInsertRowid });
     res.json({ ok: true, id: r.lastInsertRowid, class: enrichClass(getClass(class_id)) });

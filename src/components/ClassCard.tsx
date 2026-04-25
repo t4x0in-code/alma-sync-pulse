@@ -7,7 +7,10 @@ import type { SalsaClass, Enrollment } from "@/lib/api";
 const statusMap = {
   open: { label: "Plätze frei", className: "bg-success/20 text-success border-success/30" },
   limited: { label: "Wenige Plätze", className: "bg-warning/20 text-warning border-warning/30" },
-  closed: { label: "Ausgebucht", className: "bg-destructive/20 text-destructive border-destructive/30" },
+  closed: {
+    label: "Ausgebucht",
+    className: "bg-destructive/20 text-destructive border-destructive/30",
+  },
 } as const;
 
 function Avatar({ e }: { e: Enrollment }) {

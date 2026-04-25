@@ -61,7 +61,9 @@ function TonyAdmin() {
             setLoginState("error");
             toast.error(data.status === "denied" ? "Login abgelehnt." : "Anfrage abgelaufen.");
           }
-        } catch { /* network hiccup, keep polling */ }
+        } catch {
+          /* network hiccup, keep polling */
+        }
       }, 2000);
     } catch {
       setLoginState("error");
@@ -69,42 +71,62 @@ function TonyAdmin() {
     }
   };
 
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
-
-  if (!token) return (
-    <div className="flex min-h-screen flex-col">
-      <SiteHeader />
-      <main className="flex flex-1 items-center justify-center p-6">
-        <Card className="w-full max-w-sm p-8 flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-xl font-semibold">Admin-Anmeldung</h1>
-            <p className="text-sm text-muted-foreground">Bestätige den Login über Telegram.</p>
-          </div>
-          {loginState === "waiting" && loginData ? (
-            <div className="flex flex-col gap-3 text-center">
-              <p className="text-sm text-muted-foreground">PIN zur Bestätigung:</p>
-              <p className="text-4xl font-mono font-bold tracking-widest">{loginData.pin}</p>
-              <p className="text-sm text-muted-foreground animate-pulse">Warte auf Bestätigung in Telegram…</p>
-              <Button variant="ghost" size="sm" onClick={() => { clearInterval(pollRef.current!); setLoginState("idle"); }}>
-                Abbrechen
-              </Button>
-            </div>
-          ) : (
-            <Button onClick={requestLogin} disabled={loginState === "requesting"}>
-              {loginState === "requesting" ? "Anfrage wird gesendet…" : "Mit Telegram anmelden"}
-            </Button>
-          )}
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs text-muted-foreground">Oder Token manuell eingeben</Label>
-            <Input type="password" placeholder="admin token"
-              onBlur={(e) => { if (e.target.value) saveToken(e.target.value); }} />
-          </div>
-        </Card>
-      </main>
-      <SiteFooter />
-      <Toaster />
-    </div>
+  useEffect(
+    () => () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    },
+    [],
   );
+
+  if (!token)
+    return (
+      <div className="flex min-h-screen flex-col">
+        <SiteHeader />
+        <main className="flex flex-1 items-center justify-center p-6">
+          <Card className="w-full max-w-sm p-8 flex flex-col gap-6">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-xl font-semibold">Admin-Anmeldung</h1>
+              <p className="text-sm text-muted-foreground">Bestätige den Login über Telegram.</p>
+            </div>
+            {loginState === "waiting" && loginData ? (
+              <div className="flex flex-col gap-3 text-center">
+                <p className="text-sm text-muted-foreground">PIN zur Bestätigung:</p>
+                <p className="text-4xl font-mono font-bold tracking-widest">{loginData.pin}</p>
+                <p className="text-sm text-muted-foreground animate-pulse">
+                  Warte auf Bestätigung in Telegram…
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    clearInterval(pollRef.current!);
+                    setLoginState("idle");
+                  }}
+                >
+                  Abbrechen
+                </Button>
+              </div>
+            ) : (
+              <Button onClick={requestLogin} disabled={loginState === "requesting"}>
+                {loginState === "requesting" ? "Anfrage wird gesendet…" : "Mit Telegram anmelden"}
+              </Button>
+            )}
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">Oder Token manuell eingeben</Label>
+              <Input
+                type="password"
+                placeholder="admin token"
+                onBlur={(e) => {
+                  if (e.target.value) saveToken(e.target.value);
+                }}
+              />
+            </div>
+          </Card>
+        </main>
+        <SiteFooter />
+        <Toaster />
+      </div>
+    );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -118,15 +140,12 @@ function TonyAdmin() {
               Tony · Coordinates
             </span>
             <h1 className="mt-1 font-display text-4xl md:text-5xl">Admin Cockpit</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Synchronisiert mit Telegram-Bot.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Synchronisiert mit Telegram-Bot.</p>
           </div>
           <Button variant="outline" onClick={reload}>
             Refresh
           </Button>
         </div>
-
 
         <div className="space-y-8">
           {classes.map((k) => (
@@ -206,7 +225,9 @@ function ClassAdmin({
           <Button
             variant="outline"
             disabled={busy}
-            onClick={() => wrap(() => api.admin.updateClass(klass.id, { max_capacity: maxCap }, token))}
+            onClick={() =>
+              wrap(() => api.admin.updateClass(klass.id, { max_capacity: maxCap }, token))
+            }
           >
             Plätze
           </Button>
@@ -222,7 +243,9 @@ function ClassAdmin({
             <Button
               variant="outline"
               disabled={busy}
-              onClick={() => wrap(() => api.admin.updateClass(klass.id, { status: "closed" }, token))}
+              onClick={() =>
+                wrap(() => api.admin.updateClass(klass.id, { status: "closed" }, token))
+              }
             >
               /block
             </Button>
@@ -248,9 +271,7 @@ function ClassAdmin({
               <div
                 key={p.id}
                 className={`flex flex-wrap items-center gap-2 rounded-md border p-2 ${
-                  isConfirmed
-                    ? "border-success/40 bg-success/10"
-                    : "border-warning/40 bg-warning/5"
+                  isConfirmed ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/5"
                 }`}
               >
                 <span className="text-sm">
@@ -269,7 +290,9 @@ function ClassAdmin({
                       size="sm"
                       variant="outline"
                       disabled={busy}
-                      onClick={() => wrap(() => api.admin.setPairStatus(p.id, "confirmed", token), "Bestätigt")}
+                      onClick={() =>
+                        wrap(() => api.admin.setPairStatus(p.id, "confirmed", token), "Bestätigt")
+                      }
                     >
                       <Check className="h-3 w-3" /> bestätigen
                     </Button>
@@ -289,29 +312,35 @@ function ClassAdmin({
         </div>
 
         {/* Pair builder */}
-        {(freeLeaders.length > 0 && freeFollowers.length > 0) && (
+        {freeLeaders.length > 0 && freeFollowers.length > 0 && (
           <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
             <select
               className="rounded-md border border-input bg-input px-3 py-2 text-sm"
               value={pairDraft.l ?? ""}
-              onChange={(e) => setPairDraft({ ...pairDraft, l: e.target.value ? Number(e.target.value) : null })}
+              onChange={(e) =>
+                setPairDraft({ ...pairDraft, l: e.target.value ? Number(e.target.value) : null })
+              }
             >
               <option value="">— Leader wählen —</option>
               {freeLeaders.map((e) => (
                 <option key={e.id} value={e.id}>
-                  🕺 {e.name}{e.age ? `, ${e.age}` : ""}
+                  🕺 {e.name}
+                  {e.age ? `, ${e.age}` : ""}
                 </option>
               ))}
             </select>
             <select
               className="rounded-md border border-input bg-input px-3 py-2 text-sm"
               value={pairDraft.f ?? ""}
-              onChange={(e) => setPairDraft({ ...pairDraft, f: e.target.value ? Number(e.target.value) : null })}
+              onChange={(e) =>
+                setPairDraft({ ...pairDraft, f: e.target.value ? Number(e.target.value) : null })
+              }
             >
               <option value="">— Follower wählen —</option>
               {freeFollowers.map((e) => (
                 <option key={e.id} value={e.id}>
-                  💃 {e.name}{e.age ? `, ${e.age}` : ""}
+                  💃 {e.name}
+                  {e.age ? `, ${e.age}` : ""}
                 </option>
               ))}
             </select>
@@ -379,14 +408,18 @@ function ClassAdmin({
             placeholder="LL"
             maxLength={2}
             value={reservedDraft.l}
-            onChange={(e) => setReservedDraft({ ...reservedDraft, l: e.target.value.toUpperCase() })}
+            onChange={(e) =>
+              setReservedDraft({ ...reservedDraft, l: e.target.value.toUpperCase() })
+            }
             className="text-center font-mono"
           />
           <Input
             placeholder="FF"
             maxLength={2}
             value={reservedDraft.f}
-            onChange={(e) => setReservedDraft({ ...reservedDraft, f: e.target.value.toUpperCase() })}
+            onChange={(e) =>
+              setReservedDraft({ ...reservedDraft, f: e.target.value.toUpperCase() })
+            }
             className="text-center font-mono"
           />
           <Input

@@ -43,10 +43,12 @@ Same pattern already used correctly in bot Telegram commands (`/confirm`, `/unpa
 ## Investigation result
 
 Verified `bot/src/server.js` line 691-700: the handler already does a SELECT before UPDATE:
+
 ```js
 const cur = db.prepare("SELECT * FROM pairs WHERE id=?").get(id);
 if (!cur) return res.status(404).json({ error: "not found" });
 ```
+
 The audit agent reported this incorrectly. No code change needed. Moving to DONE as false-positive.
 
 ## Acceptance criteria

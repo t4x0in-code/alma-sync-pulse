@@ -124,10 +124,7 @@ async function httpRequest<T>(path: string, init?: RequestInit): Promise<T> {
  * switch to the local store for this session and re-run the operation
  * against the local fallback. Real HTTP errors (4xx/5xx) bubble up.
  */
-async function withFallback<T>(
-  http: () => Promise<T>,
-  local: () => T | Promise<T>,
-): Promise<T> {
+async function withFallback<T>(http: () => Promise<T>, local: () => T | Promise<T>): Promise<T> {
   if (mode === "local" || !API_BASE) return Promise.resolve(local());
   try {
     return await http();
@@ -181,36 +178,30 @@ export const api = {
     deleteEnrollment: (id: number, token: string) =>
       withFallback(
         () =>
-          httpRequest<{ ok: true; class: SalsaClass }>(
-            `/api/admin/enrollments/${id}`,
-            { method: "DELETE", headers: { "X-Admin-Token": token } },
-          ),
+          httpRequest<{ ok: true; class: SalsaClass }>(`/api/admin/enrollments/${id}`, {
+            method: "DELETE",
+            headers: { "X-Admin-Token": token },
+          }),
         () => localApi.deleteEnrollment(id),
       ),
     updateEnrollment: (id: number, patch: Partial<Enrollment>, token: string) =>
       withFallback(
         () =>
-          httpRequest<{ ok: true; class: SalsaClass }>(
-            `/api/admin/enrollments/${id}`,
-            {
-              method: "PATCH",
-              headers: { "X-Admin-Token": token },
-              body: JSON.stringify(patch),
-            },
-          ),
+          httpRequest<{ ok: true; class: SalsaClass }>(`/api/admin/enrollments/${id}`, {
+            method: "PATCH",
+            headers: { "X-Admin-Token": token },
+            body: JSON.stringify(patch),
+          }),
         () => localApi.updateEnrollment(id, patch),
       ),
     addEnrollment: (data: EnrollPayload, token: string) =>
       withFallback(
         () =>
-          httpRequest<{ ok: true; id: number; class: SalsaClass }>(
-            `/api/admin/enrollments`,
-            {
-              method: "POST",
-              headers: { "X-Admin-Token": token },
-              body: JSON.stringify(data),
-            },
-          ),
+          httpRequest<{ ok: true; id: number; class: SalsaClass }>(`/api/admin/enrollments`, {
+            method: "POST",
+            headers: { "X-Admin-Token": token },
+            body: JSON.stringify(data),
+          }),
         () => localApi.addEnrollment(data),
       ),
     createPair: (
@@ -221,14 +212,11 @@ export const api = {
     ) =>
       withFallback(
         () =>
-          httpRequest<{ ok: true; id: number; class: SalsaClass }>(
-            `/api/admin/pairs`,
-            {
-              method: "POST",
-              headers: { "X-Admin-Token": token },
-              body: JSON.stringify({ leader_id, follower_id, status }),
-            },
-          ),
+          httpRequest<{ ok: true; id: number; class: SalsaClass }>(`/api/admin/pairs`, {
+            method: "POST",
+            headers: { "X-Admin-Token": token },
+            body: JSON.stringify({ leader_id, follower_id, status }),
+          }),
         () => localApi.createPair(leader_id, follower_id, status),
       ),
     setPairStatus: (id: number, status: PairStatus, token: string) =>
@@ -256,23 +244,20 @@ export const api = {
     ) =>
       withFallback(
         () =>
-          httpRequest<{ ok: true; id: number; class: SalsaClass }>(
-            `/api/admin/reserved`,
-            {
-              method: "POST",
-              headers: { "X-Admin-Token": token },
-              body: JSON.stringify(data),
-            },
-          ),
+          httpRequest<{ ok: true; id: number; class: SalsaClass }>(`/api/admin/reserved`, {
+            method: "POST",
+            headers: { "X-Admin-Token": token },
+            body: JSON.stringify(data),
+          }),
         () => localApi.addReserved(data),
       ),
     deleteReserved: (id: number, token: string) =>
       withFallback(
         () =>
-          httpRequest<{ ok: true; class: SalsaClass }>(
-            `/api/admin/reserved/${id}`,
-            { method: "DELETE", headers: { "X-Admin-Token": token } },
-          ),
+          httpRequest<{ ok: true; class: SalsaClass }>(`/api/admin/reserved/${id}`, {
+            method: "DELETE",
+            headers: { "X-Admin-Token": token },
+          }),
         () => localApi.deleteReserved(id),
       ),
   },

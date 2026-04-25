@@ -7,8 +7,7 @@ export function SiteFooter() {
         <div>
           <Logo />
           <p className="mt-4 max-w-xs text-sm text-muted-foreground">
-            Tanzschule für authentische kubanische Salsa, Bachata und Latin
-            Vibes in Deutschland.
+            Tanzschule für authentische kubanische Salsa, Bachata und Latin Vibes in Deutschland.
           </p>
         </div>
         <div>

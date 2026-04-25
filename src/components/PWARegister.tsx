@@ -25,9 +25,10 @@ export function PWARegister() {
     const isPreviewHost =
       host.includes("id-preview--") ||
       host.includes("lovableproject.com") ||
-      host.includes("lovable.app") === false ? false : false; // allow .lovable.app published domains
-    const isLovablePreview =
-      host.includes("id-preview--") || host.includes("lovableproject.com");
+      host.includes("lovable.app") === false
+        ? false
+        : false; // allow .lovable.app published domains
+    const isLovablePreview = host.includes("id-preview--") || host.includes("lovableproject.com");
 
     if (isInIframe || isLovablePreview || !import.meta.env.PROD) {
       // Clean up any previously-registered SW in dev/preview

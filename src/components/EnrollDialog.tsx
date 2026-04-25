@@ -26,13 +26,7 @@ const schema = z.object({
     .min(10, "min 10")
     .max(99, "max 99")
     .optional(),
-  email: z
-    .string()
-    .trim()
-    .email("Ungültige E-Mail")
-    .max(120)
-    .optional()
-    .or(z.literal("")),
+  email: z.string().trim().email("Ungültige E-Mail").max(120).optional().or(z.literal("")),
   phone: z.string().trim().max(40).optional().or(z.literal("")),
   comment: z.string().trim().max(400, "max 400 Zeichen").optional().or(z.literal("")),
 });
@@ -139,9 +133,7 @@ export function EnrollDialog({
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">
-            Anmeldung · {klass.title}
-          </DialogTitle>
+          <DialogTitle className="font-display text-2xl">Anmeldung · {klass.title}</DialogTitle>
           <DialogDescription>
             {klass.schedule} · mit {klass.instructor}
           </DialogDescription>

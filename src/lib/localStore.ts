@@ -15,7 +15,10 @@ import type {
 const KEY = "almalatina_local_v1";
 
 interface DB {
-  classes: Omit<SalsaClass, "current_enrollment" | "counts_by_gender" | "enrollments" | "pairs" | "reserved">[];
+  classes: Omit<
+    SalsaClass,
+    "current_enrollment" | "counts_by_gender" | "enrollments" | "pairs" | "reserved"
+  >[];
   enrollments: Enrollment[];
   pairs: Pair[];
   reserved: ReservedPair[];
@@ -34,8 +37,7 @@ const seedDB = (): DB => ({
       max_capacity: 20,
       status: "open",
       external_url: "https://almalatina.de/",
-      description:
-        "Wöchentlicher Kurs für alle Levels. Authentische kubanische Salsa mit Tony.",
+      description: "Wöchentlicher Kurs für alle Levels. Authentische kubanische Salsa mit Tony.",
     },
   ],
   enrollments: [
@@ -55,11 +57,41 @@ const seedDB = (): DB => ({
     },
   ],
   reserved: [
-    { id: 1, class_id: "thu-2000-cubana", leader_nick: "TO", follower_nick: "MA", note: "Tony & Maria" },
-    { id: 2, class_id: "thu-2000-cubana", leader_nick: "RA", follower_nick: "EL", note: "Rafael & Elena" },
-    { id: 3, class_id: "thu-2000-cubana", leader_nick: "JO", follower_nick: "AN", note: "José & Ana" },
-    { id: 4, class_id: "thu-2000-cubana", leader_nick: "CA", follower_nick: "SO", note: "Carlos & Sofía" },
-    { id: 5, class_id: "thu-2000-cubana", leader_nick: "DI", follower_nick: "LU", note: "Diego & Lucía" },
+    {
+      id: 1,
+      class_id: "thu-2000-cubana",
+      leader_nick: "TO",
+      follower_nick: "MA",
+      note: "Tony & Maria",
+    },
+    {
+      id: 2,
+      class_id: "thu-2000-cubana",
+      leader_nick: "RA",
+      follower_nick: "EL",
+      note: "Rafael & Elena",
+    },
+    {
+      id: 3,
+      class_id: "thu-2000-cubana",
+      leader_nick: "JO",
+      follower_nick: "AN",
+      note: "José & Ana",
+    },
+    {
+      id: 4,
+      class_id: "thu-2000-cubana",
+      leader_nick: "CA",
+      follower_nick: "SO",
+      note: "Carlos & Sofía",
+    },
+    {
+      id: 5,
+      class_id: "thu-2000-cubana",
+      leader_nick: "DI",
+      follower_nick: "LU",
+      note: "Diego & Lucía",
+    },
   ],
   nextEnrollId: 5,
   nextPairId: 2,
@@ -163,8 +195,7 @@ export const localApi = {
     const raw = getClassRaw(db, data.class_id);
     if (!raw) throw new Error("class not found");
     const total = db.enrollments.filter((e) => e.class_id === data.class_id).length;
-    if (raw.status === "closed" || total >= raw.max_capacity)
-      throw new Error("class is full");
+    if (raw.status === "closed" || total >= raw.max_capacity) throw new Error("class is full");
     const id = db.nextEnrollId++;
     const e: Enrollment = {
       id,
@@ -262,7 +293,12 @@ export const localApi = {
     writeDB(db);
     return { ok: true as const, class: enrich(readDB(), getClassRaw(readDB(), cur.class_id)!) };
   },
-  addReserved(data: { class_id: string; leader_nick: string; follower_nick: string; note?: string }) {
+  addReserved(data: {
+    class_id: string;
+    leader_nick: string;
+    follower_nick: string;
+    note?: string;
+  }) {
     const db = readDB();
     if (!/^[A-Za-z]{2}$/.test(data.leader_nick) || !/^[A-Za-z]{2}$/.test(data.follower_nick))
       throw new Error("nicks must be 2 letters");

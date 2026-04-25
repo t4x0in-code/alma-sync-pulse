@@ -9,7 +9,12 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "precommit": "vitest run"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
@@ -67,6 +72,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@vitest/coverage-v8": "^3.1.4",
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "^1.4.0",
     "@types/node": "^22.16.5",

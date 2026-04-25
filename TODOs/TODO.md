@@ -26,7 +26,8 @@
 - [ ] [TODO-0302](./TODO-0302-accessibility-a11y/) — WCAG 2.1 AA accessibility
 - [ ] [TODO-0303](./TODO-0303-dark-light-theme-toggle/) — Dark/light theme toggle
 - [ ] [TODO-0304](./TODO-0304-admin-audit-log/) — Admin action audit log
-- [ ] [TODO-0305](./TODO-0305-test-suite/) — Test suite (Vitest + Playwright)
+- [x] [TODO-0305](./TODO-0305-test-suite/) — Test suite (Vitest + Playwright)
+- [x] [TODO-0308](./TODO-0308-bot-function-test-suite/) — Bot function test suite (TDD, 37 tests)
 
 ## P3 — Nice-to-have
 
