@@ -1,7 +1,6 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
-import { PWARegister } from "@/components/PWARegister";
 
 function NotFoundComponent() {
   return (
@@ -31,13 +30,17 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { name: "description", content: "AlmaLatina Live Sync synchronizes course availability between a website, Telegram, and an admin portal." },
       { name: "author", content: "Lovable" },
       { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:description", content: "AlmaLatina Live Sync synchronizes course availability between a website, Telegram, and an admin portal." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Lovable App" },
+      { name: "twitter:description", content: "AlmaLatina Live Sync synchronizes course availability between a website, Telegram, and an admin portal." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/16f4763d-40dd-43df-a3f3-0bd33978b124/id-preview-10188d19--7751022f-5fd5-4c03-b027-a88c37b2bc01.lovable.app-1777129485323.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/16f4763d-40dd-43df-a3f3-0bd33978b124/id-preview-10188d19--7751022f-5fd5-4c03-b027-a88c37b2bc01.lovable.app-1777129485323.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -69,10 +72,5 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
-  return (
-    <>
-      <PWARegister />
-      <Outlet />
-    </>
-  );
+  return <Outlet />;
 }
