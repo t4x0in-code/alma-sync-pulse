@@ -291,8 +291,10 @@ if (TELEGRAM_TOKEN) {
   const isAdmin = (msg) => adminChatIds.size === 0 || adminChatIds.has(String(msg.chat.id));
 
   bot.onText(/^\/start/, (msg) => {
-    const l = lang(msg.from);
-    adminLangs.set(String(msg.chat.id), l);
+    // Only set on FIRST interaction - don't overwrite explicit language choice
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), lang(msg.from));
+    }
     bot.sendMessage(msg.chat.id, t(msg, "start", { chatId: msg.chat.id }), {
       parse_mode: "Markdown",
     });

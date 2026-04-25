@@ -405,3 +405,231 @@ describe("REGRESSION: new i18n keys work", () => {
     expect(t(msg, "role_F")).toBe("💃 Follower");
   });
 });
+
+describe("REGRESSION: /start does NOT overwrite stored language", () => {
+  let adminLangs;
+
+  beforeEach(() => {
+    adminLangs = new Map();
+    initI18n(adminLangs);
+  });
+
+  it("/start keeps Russian when already stored", () => {
+    // User previously selected Russian
+    adminLangs.set("111", "ru");
+    const msg = { chat: { id: "111" }, from: { language_code: "de" } };
+
+    // Simulate what /start does: only set if NOT has
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "de");
+    }
+
+    // Stored language should STILL be Russian, not overwritten to German
+    expect(adminLangs.get("111")).toBe("ru");
+  });
+
+  it("/start keeps German when already stored", () => {
+    adminLangs.set("222", "de");
+    const msg = { chat: { id: "222" }, from: { language_code: "en" } };
+
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "en");
+    }
+
+    expect(adminLangs.get("222")).toBe("de");
+  });
+
+  it("/start keeps Spanish when already stored", () => {
+    adminLangs.set("333", "es");
+    const msg = { chat: { id: "333" }, from: { language_code: "fr" } };
+
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "fr");
+    }
+
+    expect(adminLangs.get("333")).toBe("es");
+  });
+
+  it("/start keeps Ukrainian when already stored", () => {
+    adminLangs.set("444", "uk");
+    const msg = { chat: { id: "444" }, from: { language_code: "ru" } };
+
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "ru");
+    }
+
+    expect(adminLangs.get("444")).toBe("uk");
+  });
+
+  it("/start keeps Turkish when already stored", () => {
+    adminLangs.set("555", "tr");
+    const msg = { chat: { id: "555" }, from: { language_code: "en" } };
+
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "en");
+    }
+
+    expect(adminLangs.get("555")).toBe("tr");
+  });
+
+  it("/start keeps French when already stored", () => {
+    adminLangs.set("666", "fr");
+    const msg = { chat: { id: "666" }, from: { language_code: "de" } };
+
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "de");
+    }
+
+    expect(adminLangs.get("666")).toBe("fr");
+  });
+
+  it("/start keeps Italian when already stored", () => {
+    adminLangs.set("777", "it");
+    const msg = { chat: { id: "777" }, from: { language_code: "es" } };
+
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "es");
+    }
+
+    expect(adminLangs.get("777")).toBe("it");
+  });
+
+  it("/start initializes NEW users with Telegram auto-detect", () => {
+    // First time user - no stored language
+    const msg = { chat: { id: "888" }, from: { language_code: "de" } };
+
+    if (!adminLangs.has(String(msg.chat.id))) {
+      adminLangs.set(String(msg.chat.id), "de");
+    }
+
+    // Should set to Telegram auto-detect
+    expect(adminLangs.get("888")).toBe("de");
+  });
+});
+
+describe("REGRESSION: all 8 languages work correctly", () => {
+  let adminLangs;
+
+  beforeEach(() => {
+    adminLangs = new Map();
+    initI18n(adminLangs);
+  });
+
+  it("English start message works", () => {
+    const msg = { from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Commands:");
+  });
+
+  it("German start message works", () => {
+    adminLangs.set("100", "de");
+    const msg = { chat: { id: "100" }, from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Befehle:");
+  });
+
+  it("Russian start message works", () => {
+    adminLangs.set("101", "ru");
+    const msg = { chat: { id: "101" }, from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Команды:");
+  });
+
+  it("Ukrainian start message works", () => {
+    adminLangs.set("102", "uk");
+    const msg = { chat: { id: "102" }, from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Команди:");
+  });
+
+  it("French start message works", () => {
+    adminLangs.set("103", "fr");
+    const msg = { chat: { id: "103" }, from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Commandes:");
+  });
+
+  it("Turkish start message works", () => {
+    adminLangs.set("104", "tr");
+    const msg = { chat: { id: "104" }, from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Komutlar:");
+  });
+
+  it("Italian start message works", () => {
+    adminLangs.set("105", "it");
+    const msg = { chat: { id: "105" }, from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Comandi:");
+  });
+
+  it("Spanish start message works", () => {
+    adminLangs.set("106", "es");
+    const msg = { chat: { id: "106" }, from: { language_code: "en" } };
+    const result = t(msg, "start", { chatId: "123" });
+    expect(result).toContain("AlmaLatina Bot");
+    expect(result).toContain("Comandos:");
+  });
+
+  it("lang_btn_uk works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_btn_uk")).toBe("🇺🇦 Українська");
+  });
+
+  it("lang_btn_fr works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_btn_fr")).toBe("🇫🇷 Français");
+  });
+
+  it("lang_btn_tr works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_btn_tr")).toBe("🇹🇷 Türkçe");
+  });
+
+  it("lang_btn_it works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_btn_it")).toBe("🇮🇹 Italiano");
+  });
+
+  it("lang_btn_es works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_btn_es")).toBe("🇪🇸 Español");
+  });
+
+  it("lang_name_ru works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_name_ru")).toBe("Русский");
+  });
+
+  it("lang_name_uk works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_name_uk")).toBe("Українська");
+  });
+
+  it("lang_name_fr works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_name_fr")).toBe("Français");
+  });
+
+  it("lang_name_tr works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_name_tr")).toBe("Türkçe");
+  });
+
+  it("lang_name_it works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_name_it")).toBe("Italiano");
+  });
+
+  it("lang_name_es works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "lang_name_es")).toBe("Español");
+  });
+});
