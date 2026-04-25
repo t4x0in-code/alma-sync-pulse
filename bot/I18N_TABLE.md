@@ -3,7 +3,8 @@
 ## Overview
 - **8 Languages**: en, de, ru, uk, fr, tr, it, es
 - **72 Base Keys** in DEFAULTS (English)
-- **39 Keys** translated in each locale (de, ru, uk, fr, tr, it, es)
+- **39 Keys** translated in 7 locales (de, ru, uk, fr, tr, it, es)
+- **33 Keys** NOT translated (fall back to English)
 
 ---
 
@@ -12,83 +13,80 @@
 | Locale | Translated Keys | Coverage | Notes |
 |--------|----------------|----------|-------|
 | en | 72 | 100% | DEFAULTS (base) |
-| de | 39 | 54% | Full fallback for untranslated |
-| ru | 39 | 54% | Full fallback for untranslated |
-| uk | 39 | 54% | Full fallback for untranslated |
-| fr | 39 | 54% | Full fallback for untranslated |
-| tr | 39 | 54% | Full fallback for untranslated |
-| it | 39 | 54% | Full fallback for untranslated |
-| es | 39 | 54% | Full fallback for untranslated |
+| de | 39 | 54% | 33 keys fall back to EN |
+| ru | 39 | 54% | 33 keys fall back to EN |
+| uk | 39 | 54% | 33 keys fall back to EN |
+| fr | 39 | 54% | 33 keys fall back to EN |
+| tr | 39 | 54% | 33 keys fall back to EN |
+| it | 39 | 54% | 33 keys fall back to EN |
+| es | 39 | 54% | 33 keys fall back to EN |
 
 ---
 
-## All i18n Keys
+## Non-Translated Keys (P1 - Could Translate)
 
-### Core Bot Messages (72 keys in DEFAULTS)
+**33 keys** in lines 15-54 that exist in DEFAULTS but NOT in any locale override:
+
+| Key | Line | P0-Critical | P1-Nice | P2-NoNeed |
+|-----|------|-------------|---------|----------|
+| no_access | 15 | ✓ | | |
+| no_courses | 16 | ✓ | | |
+| status_line | 17-18 | ✓ | | |
+| no_enrollments | 19 | ✓ | | |
+| select_class | 20 | ✓ | | |
+| course_not_found | 21 | ✓ | | |
+| course_not_found_id | 22 | ✓ | | |
+| enrollment_not_found | 23 | ✓ | | |
+| different_courses | 24 | ✓ | | |
+| need_l_f | 25 | ✓ | | |
+| added | 26 | ✓ | | |
+| deleted | 27 | ✓ | | |
+| not_found | 28 | ✓ | | |
+| pair_proposed | 29 | ✓ | | |
+| pair_confirmed | 30 | ✓ | | |
+| pair_not_found | 31 | ✓ | | |
+| pair_deleted | 32 | ✓ | | |
+| no_reserved | 33 | ✓ | | |
+| reserved_added | 34 | ✓ | | |
+| reserved_deleted | 35 | ✓ | | |
+| course_closed | 36 | ✓ | | |
+| course_opened | 37 | ✓ | | |
+| spot_added | 38 | ✓ | | |
+| capacity_set | 39 | ✓ | | |
+| auth_expired_cb | 40 | ✓ | | |
+| auth_expired_msg | 41 | ✓ | | |
+| auth_confirmed_cb | 42 | ✓ | | |
+| auth_confirmed_msg | 43 | ✓ | | |
+| auth_denied_cb | 44 | ✓ | | |
+| auth_denied_msg | 45 | ✓ | | |
+| auth_request | 46-47 | ✓ | | |
+| auth_confirm_btn | 48 | ✓ | | |
+| auth_deny_btn | 49 | ✓ | | |
+| db_error | 50 | ✓ | | |
+| notify_enroll | 51 | ✓ | | |
+| choose_lang | 52 | ✓ | | |
+| lang_changed | 53 | ✓ | | |
+| lang_selected | 54 | ✓ | | |
+| **lang_btn_en..es** | 56-64 | | | ✓ |
+| **lang_name_en..es** | 67-74 | | | ✓ |
+| **role_L, role_F** | 77-78 | | | ✓ |
+| **icon_L..lock** | 79-82 | | | ✓ |
+
+---
+
+## Translation Status Matrix
 
 | Key | en | de | ru | uk | fr | tr | it | es |
 |-----|----|----|----|----|----|----|----|-----|
 | start | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| no_access | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| no_courses | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| status_line | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| no_enrollments | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| select_class | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| course_not_found | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| course_not_found_id | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| enrollment_not_found | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| different_courses | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| need_l_f | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| added | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| deleted | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| not_found | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| pair_proposed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| pair_confirmed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| pair_not_found | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| pair_deleted | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| no_reserved | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| reserved_added | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| reserved_deleted | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| course_closed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| course_opened | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| spot_added | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| capacity_set | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_expired_cb | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_expired_msg | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_confirmed_cb | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_confirmed_msg | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_denied_cb | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_denied_msg | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_request | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_confirm_btn | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| auth_deny_btn | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| db_error | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| notify_enroll | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| choose_lang | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| lang_changed | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| lang_selected | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| lang_btn_en | ✓ | - | - | - | - | - | - | - |
-| lang_btn_de | ✓ | - | - | - | - | - | - | - |
-| lang_btn_ru | ✓ | - | - | - | - | - | - | - |
-| lang_btn_uk | ✓ | - | - | - | - | - | - | - |
-| lang_btn_fr | ✓ | - | - | - | - | - | - | - |
-| lang_btn_tr | ✓ | - | - | - | - | - | - | - |
-| lang_btn_it | ✓ | - | - | - | - | - | - | - |
-| lang_btn_es | ✓ | - | - | - | - | - | - | - |
-| lang_name_en | ✓ | - | - | - | - | - | - | - |
-| lang_name_de | ✓ | - | - | - | - | - | - | - |
-| lang_name_ru | ✓ | - | - | - | - | - | - | - |
-| lang_name_uk | ✓ | - | - | - | - | - | - | - |
-| lang_name_fr | ✓ | - | - | - | - | - | - | - |
-| lang_name_tr | ✓ | - | - | - | - | - | - | - |
-| lang_name_it | ✓ | - | - | - | - | - | - | - |
-| lang_name_es | ✓ | - | - | - | - | - | - | - |
-| role_L | ✓ | - | - | - | - | - | - | - |
-| role_F | ✓ | - | - | - | - | - | - | - |
-| icon_L | ✓ | - | - | - | - | - | - | - |
-| icon_F | ✓ | - | - | - | - | - | - | - |
-| icon_pair | ✓ | - | - | - | - | - | - | - |
-| icon_lock | ✓ | - | - | - | - | - | - | - |
+| no_access..lang_selected | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| lang_btn_* | ✓ | - | - | - | - | - | - | - |
+| lang_name_* | ✓ | - | - | - | - | - | - | - |
+| role_L/F | ✓ | - | - | - | - | - | - | - |
+| icon_* | ✓ | - | - | - | - | - | - | - |
+
+- ✓ = Translated
+- - = Falls back to English
 
 ---
 
@@ -105,16 +103,16 @@ user message → t(msg, key) → getEffectiveLang(msg) → locale dict lookup
 ```
 
 - Untranslated keys fallback to English (T.en)
-- All locales get full 72-key coverage via fallback
+- All 72 keys work via fallback
 
 ---
 
 ## Test Validation
 
-All 72-keys are tested in `tests/unit/i18n-regression.test.ts`:
-
-- 8 languages × 8 test cases = 95 tests pass
-- Fallback behavior verified for all untranslated keys
+103 tests in `tests/unit/i18n-regression.test.ts`:
+- All 72 keys process correctly
+- Fallback behavior verified
+- All 8 languages work
 
 ### Access Control
 
