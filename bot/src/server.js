@@ -300,33 +300,21 @@ if (TELEGRAM_TOKEN) {
 
   // Language chooser
   bot.onText(/^\/lang/, (msg) => {
-    const kb = {
-      inline_keyboard: [
-        [
-          { text: "🇬🇧 English", callback_data: "lang:en" },
-          { text: "🇩🇪 Deutsch", callback_data: "lang:de" },
-        ],
-        [
-          { text: "🇷🇺 Русский", callback_data: "lang:ru" },
-          { text: "🇺🇦 Українська", callback_data: "lang:uk" },
-        ],
-        [
-          { text: "🇫🇷 Français", callback_data: "lang:fr" },
-          { text: "🇹🇷 Türkçe", callback_data: "lang:tr" },
-        ],
-        [
-          { text: "🇮🇹 Italiano", callback_data: "lang:it" },
-          { text: "🇪🇸 Español", callback_data: "lang:es" },
-        ],
-      ],
-    };
+    const langs = ["en", "de", "ru", "uk", "fr", "tr", "it", "es"];
+    const rows = [];
+    for (let i = 0; i < langs.length; i += 2) {
+      rows.push([
+        { text: t(msg, "lang_btn_" + langs[i]), callback_data: "lang:" + langs[i] },
+        { text: t(msg, "lang_btn_" + langs[i + 1]), callback_data: "lang:" + langs[i + 1] },
+      ]);
+    }
     bot.sendMessage(msg.chat.id, t(msg, "choose_lang"), {
-      reply_markup: JSON.stringify(kb),
+      reply_markup: JSON.stringify({ inline_keyboard: rows }),
     });
   });
 
   bot.onText(/^\/status/, (msg) => {
-    const l = lang(msg.from);
+    const l = msg;
     if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
     const rows = listClasses();
     if (!rows.length) return bot.sendMessage(msg.chat.id, t(msg, "no_courses"));
@@ -354,7 +342,7 @@ if (TELEGRAM_TOKEN) {
 
   const guard = (msg) => {
     if (!isAdmin(msg)) {
-      bot.sendMessage(msg.chat.id, t(lang(msg.from), "no_access"));
+      bot.sendMessage(msg.chat.id, t(msg, "no_access"));
       return false;
     }
     return true;
@@ -362,7 +350,7 @@ if (TELEGRAM_TOKEN) {
 
   bot.onText(/^\/list(?:\s+(\S+))?$/, (msg, m) => {
     if (!guard(msg)) return;
-    const l = lang(msg.from);
+    const l = msg;
     const classIdArg = m[1];
     const classes = listClassesRaw();
 
@@ -538,33 +526,33 @@ if (TELEGRAM_TOKEN) {
       if (!guard(msg)) return;
       const c = getClass(m[1]);
       if (!c)
-        return bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_not_found_id", { id: m[1] }));
+        return bot.sendMessage(msg.chat.id, t(msg, "course_not_found_id", { id: m[1] }));
       fn(msg, c, m);
     });
 
   cmdWithId(/^\/block\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET status='closed' WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "block", { id: c.id });
-    bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_closed", { title: c.title }));
+    bot.sendMessage(msg.chat.id, t(msg, "course_closed", { title: c.title }));
   });
   cmdWithId(/^\/open\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET status='open' WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "open", { id: c.id });
-    bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_opened", { title: c.title }));
+    bot.sendMessage(msg.chat.id, t(msg, "course_opened", { title: c.title }));
   });
   cmdWithId(/^\/add_spot\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET max_capacity=max_capacity+1 WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "add_spot", { id: c.id });
     bot.sendMessage(
       msg.chat.id,
-      t(lang(msg.from), "spot_added", { title: c.title, n: c.max_capacity + 1 }),
+      t(msg, "spot_added", { title: c.title, n: c.max_capacity + 1 }),
     );
   });
   cmdWithId(/^\/set_capacity\s+(\S+)\s+(\d+)/, (msg, c, m) => {
     const n = parseInt(m[2], 10);
     db.prepare("UPDATE classes SET max_capacity=? WHERE id=?").run(n, c.id);
     log(`tg:${msg.chat.id}`, "set_capacity", { id: c.id, n });
-    bot.sendMessage(msg.chat.id, t(lang(msg.from), "capacity_set", { title: c.title, n }));
+    bot.sendMessage(msg.chat.id, t(msg, "capacity_set", { title: c.title, n }));
   });
 
   bot.on("callback_query", (q) => {
@@ -591,18 +579,8 @@ if (TELEGRAM_TOKEN) {
     if (ns === "lang") {
       const newLang = action;
       adminLangs.set(String(q.message.chat.id), newLang);
-      const langNames = {
-        en: "English",
-        de: "Deutsch",
-        ru: "Русский",
-        uk: "Українська",
-        fr: "Français",
-        tr: "Türkçe",
-        it: "Italiano",
-        es: "Español",
-      };
       bot.answerCallbackQuery(q.id, { text: t(q, "lang_changed") });
-      return bot.editMessageText(t(q, "lang_selected", { lang: langNames[newLang] ?? newLang }), {
+      return bot.editMessageText(t(q, "lang_selected", { lang: t(q, "lang_name_" + newLang) }), {
         chat_id: q.message.chat.id,
         message_id: q.message.message_id,
       });
@@ -707,7 +685,7 @@ app.post("/api/enroll", (req, res) => {
     log("web", "enroll", { class_id, id: r.lastInsertRowid });
     notifyAdmins((al) =>
       t(al, "notify_enroll", {
-        role: gender === "L" ? "🕺 Leader" : "💃 Follower",
+        role: t(al, "role_" + gender),
         name,
         age: age ? `, ${age}` : "",
         comment: comment ? `\n_${comment}_` : "",

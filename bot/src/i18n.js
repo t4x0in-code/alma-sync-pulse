@@ -52,6 +52,34 @@ const DEFAULTS = {
   choose_lang: "🌍 Choose your language:",
   lang_changed: "✓ Language updated!",
   lang_selected: "✓ Language set to {lang}",
+
+  // Language keyboard buttons
+  lang_btn_en: "🇬🇧 English",
+  lang_btn_de: "🇩🇪 Deutsch",
+  lang_btn_ru: "🇷🇺 Русский",
+  lang_btn_uk: "🇺🇦 Українська",
+  lang_btn_fr: "🇫🇷 Français",
+  lang_btn_tr: "🇹🇷 Türkçe",
+  lang_btn_it: "🇮🇹 Italiano",
+  lang_btn_es: "🇪🇸 Español",
+
+  // Language names for confirmation
+  lang_name_en: "English",
+  lang_name_de: "Deutsch",
+  lang_name_ru: "Русский",
+  lang_name_uk: "Українська",
+  lang_name_fr: "Français",
+  lang_name_tr: "Türkçe",
+  lang_name_it: "Italiano",
+  lang_name_es: "Español",
+
+  // Role icons
+  role_L: "🕺 Leader",
+  role_F: "💃 Follower",
+  icon_L: "🕺",
+  icon_F: "💃",
+  icon_pair: "💞",
+  icon_lock: "🔒",
 };
 
 // ============================================================================
