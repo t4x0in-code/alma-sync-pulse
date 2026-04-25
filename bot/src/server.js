@@ -73,6 +73,9 @@ export { adminLangs };
 // Initialize i18n with adminLangs Map
 initI18n(adminLangs);
 
+// ---------- Sequential /add wizard ----------
+const addWizardState = new Map(); // chatId -> { step, classId, gender, name, age, photo }
+
 // ---------- DB ----------
 mkdirSync(dirname(DB_PATH), { recursive: true });
 const db = new Database(DB_PATH);
@@ -275,6 +278,7 @@ if (TELEGRAM_TOKEN) {
     { command: "list", description: "List enrollments" },
     { command: "lang", description: "Change language" },
     { command: "add", description: "Add enrollment" },
+    { command: "addwizard", description: "Wizard add (step by step)" },
     { command: "del", description: "Delete enrollment" },
     { command: "match", description: "Propose pair" },
     { command: "confirm", description: "Confirm pair" },
@@ -406,6 +410,85 @@ if (TELEGRAM_TOKEN) {
       );
     log(`tg:${msg.chat.id}`, "add_enrollment", { classId, id: r.lastInsertRowid });
     bot.sendMessage(msg.chat.id, t(msg, "added", { id: r.lastInsertRowid }));
+  });
+
+  // Sequential /add wizard - start
+  bot.onText(/^\/addwizard$/, (msg) => {
+    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
+    const chatId = String(msg.chat.id);
+    addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: "", photo: "" });
+    const classes = listClassesRaw();
+    const kb = {
+      inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `addw_class:${c.id}` }]),
+    };
+    bot.sendMessage(msg.chat.id, t(msg, "add_wizard_select_class"), {
+      reply_markup: JSON.stringify(kb),
+    });
+  });
+
+  // Sequential /add wizard - callback for class selection
+  bot.on("callback_query", (q) => {
+    const [ns, action, value] = (q.data ?? "").split(":");
+    if (ns === "addw_class") {
+      const chatId = String(q.message.chat.id);
+      const state = addWizardState.get(chatId);
+      if (!state || state.step !== "class") return bot.answerCallbackQuery(q.id);
+      state.classId = value;
+      state.step = "gender";
+      addWizardState.set(chatId, state);
+      bot.answerCallbackQuery(q.id);
+      const kb = {
+        inline_keyboard: [
+          [{ text: t(q, "gender_btn_L"), callback_data: "addw_gender:L" }],
+          [{ text: t(q, "gender_btn_F"), callback_data: "addw_gender:F" }],
+        ],
+      };
+      return bot.editMessageText(t(q, "add_wizard_gender"), {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+        reply_markup: JSON.stringify(kb),
+      });
+    }
+    if (ns === "addw_gender") {
+      const chatId = String(q.message.chat.id);
+      const state = addWizardState.get(chatId);
+      if (!state || state.step !== "gender") return bot.answerCallbackQuery(q.id);
+      state.gender = value;
+      state.step = "name";
+      addWizardState.set(chatId, state);
+      bot.answerCallbackQuery(q.id);
+      return bot.editMessageText(t(q, "add_wizard_name"), {
+        chat_id: q.message.chat.id,
+        message_id: q.message.message_id,
+      });
+    }
+  });
+
+  // Sequential /add wizard - handle name, age inputs (text messages)
+  bot.on("message", (msg) => {
+    const chatId = String(msg.chat.id);
+    const state = addWizardState.get(chatId);
+    if (!state || !msg.text || msg.text.startsWith("/")) return;
+    if (state.step === "name") {
+      state.name = msg.text;
+      state.step = "age";
+      addWizardState.set(chatId, state);
+      return bot.sendMessage(msg.chat.id, t(msg, "add_wizard_age"));
+    }
+    if (state.step === "age") {
+      const ageNum = parseInt(msg.text, 10);
+      state.age = ageNum > 0 && ageNum < 100 ? String(ageNum) : "";
+      state.step = "photo";
+      addWizardState.set(chatId, state);
+      const kb = {
+        inline_keyboard: [
+          [{ text: t(msg, "add_wizard_skip_photo"), callback_data: "addw_photo:skip" }],
+        ],
+      };
+      return bot.sendMessage(msg.chat.id, t(msg, "add_wizard_photo"), {
+        reply_markup: JSON.stringify(kb),
+      });
+    }
   });
 
   bot.onText(/^\/del\s+(\d+)/, (msg, m) => {
