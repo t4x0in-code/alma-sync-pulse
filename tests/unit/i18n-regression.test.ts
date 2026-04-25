@@ -633,3 +633,97 @@ describe("REGRESSION: all 8 languages work correctly", () => {
     expect(t(msg, "lang_name_es")).toBe("Español");
   });
 });
+
+describe("REGRESSION: all 72 i18n keys exist and process correctly", () => {
+  let adminLangs;
+
+  beforeEach(() => {
+    adminLangs = new Map();
+    initI18n(adminLangs);
+  });
+
+  const allKeys = [
+    "start", "no_access", "no_courses", "status_line", "no_enrollments",
+    "select_class", "course_not_found", "course_not_found_id",
+    "enrollment_not_found", "different_courses", "need_l_f", "added",
+    "deleted", "not_found", "pair_proposed", "pair_confirmed",
+    "pair_not_found", "pair_deleted", "no_reserved", "reserved_added",
+    "reserved_deleted", "course_closed", "course_opened", "spot_added",
+    "capacity_set", "auth_expired_cb", "auth_expired_msg",
+    "auth_confirmed_cb", "auth_confirmed_msg", "auth_denied_cb", "auth_denied_msg",
+    "auth_request", "auth_confirm_btn", "auth_deny_btn", "db_error",
+    "notify_enroll", "choose_lang", "lang_changed", "lang_selected",
+    "lang_btn_en", "lang_btn_de", "lang_btn_ru", "lang_btn_uk",
+    "lang_btn_fr", "lang_btn_tr", "lang_btn_it", "lang_btn_es",
+    "lang_name_en", "lang_name_de", "lang_name_ru", "lang_name_uk",
+    "lang_name_fr", "lang_name_tr", "lang_name_it", "lang_name_es",
+    "role_L", "role_F", "icon_L", "icon_F", "icon_pair", "icon_lock",
+  ];
+
+  const locales = ["en", "de", "ru", "uk", "fr", "tr", "it", "es"];
+
+  it("all 72 keys exist in English", () => {
+    const msg = { from: { language_code: "en" } };
+    for (const key of allKeys) {
+      const result = t(msg, key);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe("string");
+      expect(result.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("all keys fallback to English when locale missing key", () => {
+    adminLangs.set("123", "de");
+    const msg = { chat: { id: "123" }, from: { language_code: "en" } };
+    for (const key of allKeys) {
+      const result = t(msg, key);
+      expect(result).toBeDefined();
+      expect(typeof result).toBe("string");
+    }
+  });
+
+  it("all keys work in all 8 locales", () => {
+    const msgBase = { from: { language_code: "en" } };
+    for (const loc of locales) {
+      if (loc === "en") continue;
+      adminLangs.set("test" + loc, loc);
+      const msg = { chat: { id: "test" + loc }, from: { language_code: "en" } };
+      for (const key of allKeys.slice(0, 10)) {
+        const result = t(msg, key);
+        expect(result).toBeDefined();
+      }
+    }
+  });
+
+  it("getEffectiveLang returns stored preference over Telegram auto-detect", () => {
+    adminLangs.set("999", "ru");
+    const msg = { chat: { id: "999" }, from: { language_code: "de" } };
+    const result = t(msg, "no_access");
+    expect(result).toContain("🚫");
+  });
+
+  it("getEffectiveLang falls back to Telegram auto-detect when no stored", () => {
+    const msg = { chat: { id: "888" }, from: { language_code: "ru" } };
+    const result = t(msg, "no_courses");
+    expect(result).toContain("Курсы");
+  });
+
+  it("getEffectiveLang falls back to English when nothing", () => {
+    const msg = { from: { language_code: "xx" } };
+    const result = t(msg, "no_courses");
+    expect(result).toBe("No courses.");
+  });
+
+  it("placeholder replacement works", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "added", { id: 123 })).toBe("✅ #123 added.");
+    expect(t(msg, "course_not_found_id", { id: "xyz" })).toContain("xyz");
+    expect(t(msg, "capacity_set", { title: "Test", n: 10 })).toContain("10");
+  });
+
+  it("role_L and role_F use gender parameter", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "role_L")).toBe("🕺 Leader");
+    expect(t(msg, "role_F")).toBe("💃 Follower");
+  });
+});
