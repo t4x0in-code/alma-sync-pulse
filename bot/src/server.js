@@ -1,7 +1,15 @@
 // AlmaLatina Bot — Single Source of Truth
 // Express REST API + SQLite + Telegram polling
-// All env vars: TELEGRAM_TOKEN, ADMIN_TOKEN, ADMIN_CHAT_IDS (comma separated),
-//   PORT (default 8080), DB_PATH (default /data/almalatina.db), CORS_ORIGIN (default *)
+//
+// Domain model:
+//   classes         — kурсы
+//   enrollments     — заявки (ученик: имя, gender L/F, возраст, фото, коммент)
+//   pairs           — подтверждённые/предложенные пары (leader_id, follower_id, status)
+//   reserved_pairs  — постоянно зарезервированные пары (двухбуквенные ники)
+//
+// Env: TELEGRAM_TOKEN, ADMIN_TOKEN, ADMIN_CHAT_IDS (comma separated),
+//      PORT (default 8080), DB_PATH (default /data/almalatina.db),
+//      CORS_ORIGIN (default *), MAX_PHOTO_BYTES (default 800000 ~ 800KB base64).
 
 import express from "express";
 import cors from "cors";
@@ -17,7 +25,10 @@ const {
   PORT = "8080",
   DB_PATH = "/data/almalatina.db",
   CORS_ORIGIN = "*",
+  MAX_PHOTO_BYTES = "800000",
 } = process.env;
+
+const MAX_PHOTO = Number(MAX_PHOTO_BYTES);
 
 const adminChatIds = new Set(
   ADMIN_CHAT_IDS.split(",").map((s) => s.trim()).filter(Boolean),
@@ -35,7 +46,6 @@ db.exec(`
     instructor TEXT NOT NULL,
     schedule TEXT NOT NULL,
     max_capacity INTEGER NOT NULL,
-    current_enrollment INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'open',
     external_url TEXT NOT NULL DEFAULT 'https://almalatina.de/',
     description TEXT
@@ -44,9 +54,32 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     class_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    email TEXT NOT NULL,
+    gender TEXT NOT NULL,           -- 'L' (Leader/M) | 'F' (Follower/Ж)
+    age INTEGER,
+    email TEXT,
     phone TEXT,
+    photo TEXT,                     -- data URL (base64) or external URL
+    comment TEXT,
+    looking_for TEXT,               -- enrollment.id partner preference (optional)
+    source TEXT NOT NULL DEFAULT 'web', -- 'web' | 'tg:<chatid>' | 'admin'
     created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pairs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    class_id TEXT NOT NULL,
+    leader_id INTEGER NOT NULL,
+    follower_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'proposed', -- 'proposed' | 'confirmed'
+    created_at INTEGER NOT NULL,
+    UNIQUE(class_id, leader_id, follower_id)
+  );
+  CREATE TABLE IF NOT EXISTS reserved_pairs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    class_id TEXT NOT NULL,
+    leader_nick TEXT NOT NULL,      -- 2 letters
+    follower_nick TEXT NOT NULL,    -- 2 letters
+    note TEXT,
+    UNIQUE(class_id, leader_nick, follower_nick)
   );
   CREATE TABLE IF NOT EXISTS admin_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,23 +90,57 @@ db.exec(`
   );
 `);
 
+// Migration: drop legacy current_enrollment column if present (now derived).
+try {
+  const cols = db.prepare("PRAGMA table_info(classes)").all();
+  if (cols.some((c) => c.name === "current_enrollment")) {
+    // SQLite supports DROP COLUMN since 3.35
+    db.exec("ALTER TABLE classes DROP COLUMN current_enrollment");
+  }
+  const ecols = db.prepare("PRAGMA table_info(enrollments)").all();
+  const has = (n) => ecols.some((c) => c.name === n);
+  if (!has("gender")) db.exec("ALTER TABLE enrollments ADD COLUMN gender TEXT NOT NULL DEFAULT 'L'");
+  if (!has("age")) db.exec("ALTER TABLE enrollments ADD COLUMN age INTEGER");
+  if (!has("photo")) db.exec("ALTER TABLE enrollments ADD COLUMN photo TEXT");
+  if (!has("comment")) db.exec("ALTER TABLE enrollments ADD COLUMN comment TEXT");
+  if (!has("looking_for")) db.exec("ALTER TABLE enrollments ADD COLUMN looking_for TEXT");
+  if (!has("source")) db.exec("ALTER TABLE enrollments ADD COLUMN source TEXT NOT NULL DEFAULT 'web'");
+} catch (e) {
+  console.warn("Migration warning:", e.message);
+}
+
 // Seed default Thursday class
 const seed = db.prepare("SELECT COUNT(*) AS n FROM classes").get();
 if (seed.n === 0) {
   db.prepare(
-    `INSERT INTO classes (id,title,instructor,schedule,max_capacity,current_enrollment,status,external_url,description)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO classes (id,title,instructor,schedule,max_capacity,status,external_url,description)
+     VALUES (?,?,?,?,?,?,?,?)`,
   ).run(
     "thu-2000-cubana",
     "Salsa Cubana — Open Level",
     "Tony",
     "Donnerstag · 20:00 – 21:30",
     20,
-    0,
     "open",
     "https://almalatina.de/",
     "Wöchentlicher Kurs für alle Levels. Authentische kubanische Salsa.",
   );
+}
+
+// Seed reserved pairs (постоянные)
+const seedR = db.prepare("SELECT COUNT(*) AS n FROM reserved_pairs").get();
+if (seedR.n === 0) {
+  const ins = db.prepare(
+    "INSERT INTO reserved_pairs (class_id,leader_nick,follower_nick,note) VALUES (?,?,?,?)",
+  );
+  const cls = "thu-2000-cubana";
+  [
+    ["TO", "MA", "Tony & Maria"],
+    ["RA", "EL", "Rafael & Elena"],
+    ["JO", "AN", "José & Ana"],
+    ["CA", "SO", "Carlos & Sofía"],
+    ["DI", "LU", "Diego & Lucía"],
+  ].forEach(([l, f, n]) => ins.run(cls, l, f, n));
 }
 
 const log = (actor, action, payload) =>
@@ -83,15 +150,78 @@ const log = (actor, action, payload) =>
     )
     .run(actor, action, payload ? JSON.stringify(payload) : null, Date.now());
 
-const recomputeStatus = (c) => {
-  if (c.current_enrollment >= c.max_capacity) return "closed";
-  if (c.current_enrollment >= c.max_capacity * 0.8) return "limited";
-  return c.status === "closed" ? "closed" : "open";
+// ---------- Helpers ----------
+const getClass = (id) => db.prepare("SELECT * FROM classes WHERE id = ?").get(id);
+const listClassesRaw = () => db.prepare("SELECT * FROM classes ORDER BY id").all();
+
+const countByGender = (classId) => {
+  const rows = db
+    .prepare("SELECT gender, COUNT(*) AS n FROM enrollments WHERE class_id=? GROUP BY gender")
+    .all(classId);
+  const out = { L: 0, F: 0 };
+  rows.forEach((r) => (out[r.gender] = r.n));
+  return out;
 };
 
-const getClass = (id) =>
-  db.prepare("SELECT * FROM classes WHERE id = ?").get(id);
-const listClasses = () => db.prepare("SELECT * FROM classes ORDER BY id").all();
+const listEnrollments = (classId) =>
+  db
+    .prepare(
+      `SELECT id, class_id, name, gender, age, email, phone, photo, comment,
+              looking_for, source, created_at
+         FROM enrollments WHERE class_id=? ORDER BY created_at ASC`,
+    )
+    .all(classId);
+
+const listPairs = (classId) =>
+  db
+    .prepare(
+      `SELECT id, class_id, leader_id, follower_id, status, created_at
+         FROM pairs WHERE class_id=? ORDER BY created_at ASC`,
+    )
+    .all(classId);
+
+const listReserved = (classId) =>
+  db
+    .prepare(
+      `SELECT id, class_id, leader_nick, follower_nick, note
+         FROM reserved_pairs WHERE class_id=? ORDER BY id ASC`,
+    )
+    .all(classId);
+
+const computeStatus = (klass, totalEnroll) => {
+  if (klass.status === "closed") return "closed";
+  if (totalEnroll >= klass.max_capacity) return "closed";
+  if (totalEnroll >= klass.max_capacity * 0.8) return "limited";
+  return "open";
+};
+
+const enrichClass = (klass) => {
+  const enrollments = listEnrollments(klass.id);
+  const counts = countByGender(klass.id);
+  const pairs = listPairs(klass.id);
+  const reserved = listReserved(klass.id);
+  const total = enrollments.length;
+  return {
+    ...klass,
+    current_enrollment: total,
+    counts_by_gender: counts,
+    enrollments,
+    pairs,
+    reserved,
+    status: computeStatus(klass, total),
+  };
+};
+
+const listClasses = () => listClassesRaw().map(enrichClass);
+
+const validatePhoto = (photo) => {
+  if (!photo) return null;
+  if (typeof photo !== "string") throw new Error("invalid photo");
+  if (photo.length > MAX_PHOTO) throw new Error("photo too large");
+  if (!/^data:image\/(png|jpe?g|webp);base64,/.test(photo) && !/^https?:\/\//.test(photo))
+    throw new Error("photo must be data URL or http(s) URL");
+  return photo;
+};
 
 // ---------- Telegram ----------
 let bot = null;
@@ -105,7 +235,7 @@ if (TELEGRAM_TOKEN) {
   bot.onText(/^\/start/, (msg) => {
     bot.sendMessage(
       msg.chat.id,
-      `🌹 *AlmaLatina Bot*\nDeine Chat-ID: \`${msg.chat.id}\`\n\nFüge sie zu ADMIN_CHAT_IDS hinzu, um Befehle zu nutzen.\n\nBefehle:\n/status — Übersicht\n/block <id> — Schliessen\n/open <id> — Öffnen\n/add\\_spot <id> — +1 Platz\n/set\\_capacity <id> <n>\n/list\\_enrollments <id>`,
+      `🌹 *AlmaLatina Bot*\nDeine Chat-ID: \`${msg.chat.id}\`\n\nFüge sie zu ADMIN_CHAT_IDS hinzu, um Befehle zu nutzen.\n\n*Befehle:*\n/status — Übersicht (M/Ж, пары)\n/list <id> — все заявки\n/add <id> <L|F> <name> [age] — добавить заявку\n/del <enrollmentId>\n/match <leaderId> <followerId> — предложить пару\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [note]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>`,
       { parse_mode: "Markdown" },
     );
   });
@@ -115,20 +245,136 @@ if (TELEGRAM_TOKEN) {
     const rows = listClasses();
     if (!rows.length) return bot.sendMessage(msg.chat.id, "Keine Kurse.");
     const txt = rows
-      .map(
-        (c) =>
-          `*${c.title}* \`${c.id}\`\n${c.schedule}\n👥 ${c.current_enrollment}/${c.max_capacity} · ${c.status}`,
-      )
+      .map((c) => {
+        const confirmed = c.pairs.filter((p) => p.status === "confirmed").length;
+        const proposed = c.pairs.filter((p) => p.status === "proposed").length;
+        return `*${c.title}* \`${c.id}\`\n${c.schedule}\n👥 ${c.current_enrollment}/${c.max_capacity} · ${c.status}\n💃 F: ${c.counts_by_gender.F}  🕺 L: ${c.counts_by_gender.L}\n💞 пары: ${confirmed} ✓ / ${proposed} ?\n🔒 reserved: ${c.reserved.length}`;
+      })
       .join("\n\n");
     bot.sendMessage(msg.chat.id, txt, { parse_mode: "Markdown" });
   });
 
+  const guard = (msg) => {
+    if (!isAdmin(msg)) {
+      bot.sendMessage(msg.chat.id, "🚫 Kein Zugriff.");
+      return false;
+    }
+    return true;
+  };
+
+  bot.onText(/^\/list\s+(\S+)/, (msg, m) => {
+    if (!guard(msg)) return;
+    const c = getClass(m[1]);
+    if (!c) return bot.sendMessage(msg.chat.id, "❌ Kurs nicht gefunden.");
+    const en = listEnrollments(c.id);
+    if (!en.length) return bot.sendMessage(msg.chat.id, "Noch keine Anmeldungen.");
+    const txt = en
+      .map(
+        (r) =>
+          `#${r.id} ${r.gender === "L" ? "🕺" : "💃"} *${r.name}*${r.age ? `, ${r.age}` : ""}${r.comment ? `\n   _${r.comment}_` : ""}`,
+      )
+      .join("\n");
+    bot.sendMessage(msg.chat.id, `*${c.title}*\n${txt}`, { parse_mode: "Markdown" });
+  });
+
+  bot.onText(/^\/add\s+(\S+)\s+(L|F)\s+(.+?)(?:\s+(\d{1,3}))?$/i, (msg, m) => {
+    if (!guard(msg)) return;
+    const [, classId, g, name, age] = m;
+    const c = getClass(classId);
+    if (!c) return bot.sendMessage(msg.chat.id, "❌ Kurs nicht gefunden.");
+    const r = db
+      .prepare(
+        "INSERT INTO enrollments (class_id,name,gender,age,source,created_at) VALUES (?,?,?,?,?,?)",
+      )
+      .run(classId, name.trim(), g.toUpperCase(), age ? Number(age) : null, `tg:${msg.chat.id}`, Date.now());
+    log(`tg:${msg.chat.id}`, "add_enrollment", { classId, id: r.lastInsertRowid });
+    bot.sendMessage(msg.chat.id, `✅ #${r.lastInsertRowid} hinzugefügt.`);
+  });
+
+  bot.onText(/^\/del\s+(\d+)/, (msg, m) => {
+    if (!guard(msg)) return;
+    const id = Number(m[1]);
+    db.prepare("DELETE FROM pairs WHERE leader_id=? OR follower_id=?").run(id, id);
+    const r = db.prepare("DELETE FROM enrollments WHERE id=?").run(id);
+    log(`tg:${msg.chat.id}`, "del_enrollment", { id });
+    bot.sendMessage(msg.chat.id, r.changes ? `🗑 #${id} entfernt.` : "❌ nicht gefunden.");
+  });
+
+  bot.onText(/^\/match\s+(\d+)\s+(\d+)/, (msg, m) => {
+    if (!guard(msg)) return;
+    const a = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[1]));
+    const b = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[2]));
+    if (!a || !b) return bot.sendMessage(msg.chat.id, "❌ Anmeldungen nicht gefunden.");
+    if (a.class_id !== b.class_id) return bot.sendMessage(msg.chat.id, "❌ verschiedene Kurse.");
+    const leader = a.gender === "L" ? a : b.gender === "L" ? b : null;
+    const follower = a.gender === "F" ? a : b.gender === "F" ? b : null;
+    if (!leader || !follower) return bot.sendMessage(msg.chat.id, "❌ нужны 1×L и 1×F.");
+    try {
+      const r = db
+        .prepare(
+          "INSERT INTO pairs (class_id,leader_id,follower_id,status,created_at) VALUES (?,?,?,?,?)",
+        )
+        .run(a.class_id, leader.id, follower.id, "proposed", Date.now());
+      log(`tg:${msg.chat.id}`, "match", { id: r.lastInsertRowid });
+      bot.sendMessage(msg.chat.id, `💞 пара #${r.lastInsertRowid}: ${leader.name} ↔ ${follower.name} (proposed)`);
+    } catch (e) {
+      bot.sendMessage(msg.chat.id, `❌ ${e.message}`);
+    }
+  });
+
+  bot.onText(/^\/confirm\s+(\d+)/, (msg, m) => {
+    if (!guard(msg)) return;
+    const r = db.prepare("UPDATE pairs SET status='confirmed' WHERE id=?").run(Number(m[1]));
+    log(`tg:${msg.chat.id}`, "confirm_pair", { id: Number(m[1]) });
+    bot.sendMessage(msg.chat.id, r.changes ? `✓ пара ${m[1]} подтверждена.` : "❌ не найдена.");
+  });
+
+  bot.onText(/^\/unpair\s+(\d+)/, (msg, m) => {
+    if (!guard(msg)) return;
+    const r = db.prepare("DELETE FROM pairs WHERE id=?").run(Number(m[1]));
+    log(`tg:${msg.chat.id}`, "unpair", { id: Number(m[1]) });
+    bot.sendMessage(msg.chat.id, r.changes ? `🗑 пара ${m[1]} удалена.` : "❌ не найдена.");
+  });
+
+  bot.onText(/^\/reserved\s+(\S+)/, (msg, m) => {
+    if (!guard(msg)) return;
+    const rows = listReserved(m[1]);
+    if (!rows.length) return bot.sendMessage(msg.chat.id, "Keine reservierten Paare.");
+    bot.sendMessage(
+      msg.chat.id,
+      rows.map((r) => `#${r.id} 🔒 ${r.leader_nick}–${r.follower_nick}${r.note ? ` · ${r.note}` : ""}`).join("\n"),
+    );
+  });
+
+  bot.onText(/^\/add_reserved\s+(\S+)\s+([A-Za-z]{2})\s+([A-Za-z]{2})(?:\s+(.+))?$/, (msg, m) => {
+    if (!guard(msg)) return;
+    const [, classId, l, f, note] = m;
+    try {
+      const r = db
+        .prepare(
+          "INSERT INTO reserved_pairs (class_id,leader_nick,follower_nick,note) VALUES (?,?,?,?)",
+        )
+        .run(classId, l.toUpperCase(), f.toUpperCase(), note || null);
+      log(`tg:${msg.chat.id}`, "add_reserved", { id: r.lastInsertRowid });
+      bot.sendMessage(msg.chat.id, `🔒 reserved #${r.lastInsertRowid}: ${l.toUpperCase()}–${f.toUpperCase()}`);
+    } catch (e) {
+      bot.sendMessage(msg.chat.id, `❌ ${e.message}`);
+    }
+  });
+
+  bot.onText(/^\/del_reserved\s+(\d+)/, (msg, m) => {
+    if (!guard(msg)) return;
+    const r = db.prepare("DELETE FROM reserved_pairs WHERE id=?").run(Number(m[1]));
+    log(`tg:${msg.chat.id}`, "del_reserved", { id: Number(m[1]) });
+    bot.sendMessage(msg.chat.id, r.changes ? `🗑 reserved ${m[1]} entfernt.` : "❌ nicht gefunden.");
+  });
+
+  // Class admin
   const cmdWithId = (re, fn) =>
     bot.onText(re, (msg, m) => {
-      if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, "🚫 Kein Zugriff.");
-      const id = m[1];
-      const c = getClass(id);
-      if (!c) return bot.sendMessage(msg.chat.id, `❌ Kurs ${id} nicht gefunden.`);
+      if (!guard(msg)) return;
+      const c = getClass(m[1]);
+      if (!c) return bot.sendMessage(msg.chat.id, `❌ Kurs ${m[1]} nicht gefunden.`);
       fn(msg, c, m);
     });
 
@@ -137,36 +383,21 @@ if (TELEGRAM_TOKEN) {
     log(`tg:${msg.chat.id}`, "block", { id: c.id });
     bot.sendMessage(msg.chat.id, `🔒 ${c.title} geschlossen.`);
   });
-
   cmdWithId(/^\/open\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET status='open' WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "open", { id: c.id });
     bot.sendMessage(msg.chat.id, `🔓 ${c.title} geöffnet.`);
   });
-
   cmdWithId(/^\/add_spot\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET max_capacity=max_capacity+1 WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "add_spot", { id: c.id });
-    const next = getClass(c.id);
-    bot.sendMessage(msg.chat.id, `➕ ${c.title}: ${next.max_capacity} Plätze.`);
+    bot.sendMessage(msg.chat.id, `➕ ${c.title}: ${c.max_capacity + 1} Plätze.`);
   });
-
   cmdWithId(/^\/set_capacity\s+(\S+)\s+(\d+)/, (msg, c, m) => {
     const n = parseInt(m[2], 10);
     db.prepare("UPDATE classes SET max_capacity=? WHERE id=?").run(n, c.id);
     log(`tg:${msg.chat.id}`, "set_capacity", { id: c.id, n });
     bot.sendMessage(msg.chat.id, `📏 ${c.title}: max ${n}`);
-  });
-
-  cmdWithId(/^\/list_enrollments\s+(\S+)/, (msg, c) => {
-    const rows = db
-      .prepare("SELECT name,email,phone,created_at FROM enrollments WHERE class_id=? ORDER BY id DESC LIMIT 30")
-      .all(c.id);
-    if (!rows.length) return bot.sendMessage(msg.chat.id, "Noch keine Anmeldungen.");
-    const txt = rows
-      .map((r) => `• ${r.name} — ${r.email}${r.phone ? " · " + r.phone : ""}`)
-      .join("\n");
-    bot.sendMessage(msg.chat.id, `*${c.title}*\n${txt}`, { parse_mode: "Markdown" });
   });
 } else {
   console.warn("⚠ TELEGRAM_TOKEN not set — bot disabled, REST API only");
@@ -182,7 +413,7 @@ const notifyAdmins = (text) => {
 // ---------- REST API ----------
 const app = express();
 app.use(cors({ origin: CORS_ORIGIN }));
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 app.get("/health", (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
@@ -191,73 +422,79 @@ app.get("/api/classes", (_req, res) => res.json(listClasses()));
 app.get("/api/classes/:id", (req, res) => {
   const c = getClass(req.params.id);
   if (!c) return res.status(404).json({ error: "not found" });
-  res.json(c);
+  res.json(enrichClass(c));
 });
 
+// Public enrollment (gender + age + photo + comment)
 app.post("/api/enroll", (req, res) => {
-  const { class_id, name, email, phone } = req.body || {};
-  if (!class_id || !name || !email)
-    return res.status(400).json({ error: "class_id, name, email required" });
-  if (typeof name !== "string" || name.length < 2 || name.length > 80)
-    return res.status(400).json({ error: "invalid name" });
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 120)
-    return res.status(400).json({ error: "invalid email" });
+  try {
+    const { class_id, name, gender, age, email, phone, photo, comment } = req.body || {};
+    if (!class_id || !name) return res.status(400).json({ error: "class_id, name required" });
+    if (typeof name !== "string" || name.trim().length < 2 || name.length > 80)
+      return res.status(400).json({ error: "invalid name" });
+    if (gender !== "L" && gender !== "F")
+      return res.status(400).json({ error: "gender must be 'L' or 'F'" });
+    if (age != null && (!Number.isInteger(age) || age < 10 || age > 99))
+      return res.status(400).json({ error: "invalid age (10-99)" });
+    if (email && (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 120))
+      return res.status(400).json({ error: "invalid email" });
+    if (comment && (typeof comment !== "string" || comment.length > 400))
+      return res.status(400).json({ error: "comment too long (max 400)" });
+    const cleanPhoto = validatePhoto(photo);
 
-  const c = getClass(class_id);
-  if (!c) return res.status(404).json({ error: "class not found" });
-  if (c.status === "closed" || c.current_enrollment >= c.max_capacity)
-    return res.status(409).json({ error: "class is full" });
+    const c = getClass(class_id);
+    if (!c) return res.status(404).json({ error: "class not found" });
+    const enrolled = listEnrollments(class_id).length;
+    if (c.status === "closed" || enrolled >= c.max_capacity)
+      return res.status(409).json({ error: "class is full" });
 
-  db.prepare(
-    "INSERT INTO enrollments (class_id,name,email,phone,created_at) VALUES (?,?,?,?,?)",
-  ).run(class_id, name.trim(), email.trim(), phone?.trim() || null, Date.now());
+    const r = db
+      .prepare(
+        `INSERT INTO enrollments (class_id,name,gender,age,email,phone,photo,comment,source,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(
+        class_id,
+        name.trim(),
+        gender,
+        age ?? null,
+        email?.trim() || null,
+        phone?.trim() || null,
+        cleanPhoto,
+        comment?.trim() || null,
+        "web",
+        Date.now(),
+      );
 
-  const newEnroll = c.current_enrollment + 1;
-  const newStatus = recomputeStatus({ ...c, current_enrollment: newEnroll });
-  db.prepare(
-    "UPDATE classes SET current_enrollment=?, status=? WHERE id=?",
-  ).run(newEnroll, newStatus, class_id);
-
-  const updated = getClass(class_id);
-  log("web", "enroll", { class_id, name, email });
-  notifyAdmins(
-    `🌹 *Neue Anmeldung*\n${name} (${email})\n→ *${c.title}*\n👥 ${newEnroll}/${c.max_capacity}`,
-  );
-  res.json({ ok: true, class: updated });
+    log("web", "enroll", { class_id, id: r.lastInsertRowid });
+    notifyAdmins(
+      `🌹 *Neue Anmeldung* (${gender === "L" ? "🕺 Leader" : "💃 Follower"})\n*${name}*${age ? `, ${age}` : ""}${comment ? `\n_${comment}_` : ""}\n→ *${c.title}*\nID #${r.lastInsertRowid}`,
+    );
+    res.json({ ok: true, enrollment_id: r.lastInsertRowid, class: enrichClass(c) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
 });
 
-// Admin
+// Admin guard
 app.use("/api/admin", (req, res, next) => {
   if (req.headers["x-admin-token"] !== ADMIN_TOKEN)
     return res.status(401).json({ error: "unauthorized" });
   next();
 });
 
+// --- Class CRUD ---
 app.patch("/api/admin/classes/:id", (req, res) => {
   const c = getClass(req.params.id);
   if (!c) return res.status(404).json({ error: "not found" });
-  const allowed = [
-    "title",
-    "instructor",
-    "schedule",
-    "max_capacity",
-    "current_enrollment",
-    "status",
-    "external_url",
-    "description",
-  ];
+  const allowed = ["title", "instructor", "schedule", "max_capacity", "status", "external_url", "description"];
   const patch = {};
   for (const k of allowed) if (k in req.body) patch[k] = req.body[k];
-  if (!Object.keys(patch).length)
-    return res.status(400).json({ error: "no fields" });
-
+  if (!Object.keys(patch).length) return res.status(400).json({ error: "no fields" });
   const sets = Object.keys(patch).map((k) => `${k}=?`).join(",");
-  db.prepare(`UPDATE classes SET ${sets} WHERE id=?`).run(
-    ...Object.values(patch),
-    c.id,
-  );
-  log("admin", "patch", { id: c.id, patch });
-  res.json(getClass(c.id));
+  db.prepare(`UPDATE classes SET ${sets} WHERE id=?`).run(...Object.values(patch), c.id);
+  log("admin", "patch_class", { id: c.id, patch });
+  res.json(enrichClass(getClass(c.id)));
 });
 
 app.post("/api/admin/classes", (req, res) => {
@@ -265,19 +502,11 @@ app.post("/api/admin/classes", (req, res) => {
   if (!id || !title) return res.status(400).json({ error: "id, title required" });
   try {
     db.prepare(
-      `INSERT INTO classes (id,title,instructor,schedule,max_capacity,current_enrollment,status,external_url,description)
-       VALUES (?,?,?,?,?,0,'open',?,?)`,
-    ).run(
-      id,
-      title,
-      instructor || "Tony",
-      schedule || "TBD",
-      max_capacity || 20,
-      external_url || "https://almalatina.de/",
-      description || null,
-    );
-    log("admin", "create", { id });
-    res.json(getClass(id));
+      `INSERT INTO classes (id,title,instructor,schedule,max_capacity,status,external_url,description)
+       VALUES (?,?,?,?,?,'open',?,?)`,
+    ).run(id, title, instructor || "Tony", schedule || "TBD", max_capacity || 20, external_url || "https://almalatina.de/", description || null);
+    log("admin", "create_class", { id });
+    res.json(enrichClass(getClass(id)));
   } catch (e) {
     res.status(400).json({ error: e.message });
   }
@@ -285,8 +514,121 @@ app.post("/api/admin/classes", (req, res) => {
 
 app.delete("/api/admin/classes/:id", (req, res) => {
   db.prepare("DELETE FROM classes WHERE id=?").run(req.params.id);
-  log("admin", "delete", { id: req.params.id });
+  db.prepare("DELETE FROM enrollments WHERE class_id=?").run(req.params.id);
+  db.prepare("DELETE FROM pairs WHERE class_id=?").run(req.params.id);
+  db.prepare("DELETE FROM reserved_pairs WHERE class_id=?").run(req.params.id);
+  log("admin", "delete_class", { id: req.params.id });
   res.json({ ok: true });
+});
+
+// --- Enrollment CRUD (admin) ---
+app.post("/api/admin/enrollments", (req, res) => {
+  try {
+    const { class_id, name, gender, age, email, phone, photo, comment } = req.body || {};
+    if (!class_id || !name || !gender) return res.status(400).json({ error: "class_id, name, gender required" });
+    if (gender !== "L" && gender !== "F") return res.status(400).json({ error: "invalid gender" });
+    const cleanPhoto = validatePhoto(photo);
+    const r = db
+      .prepare(
+        `INSERT INTO enrollments (class_id,name,gender,age,email,phone,photo,comment,source,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .run(class_id, name.trim(), gender, age ?? null, email || null, phone || null, cleanPhoto, comment || null, "admin", Date.now());
+    log("admin", "add_enrollment", { id: r.lastInsertRowid });
+    res.json({ ok: true, id: r.lastInsertRowid, class: enrichClass(getClass(class_id)) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.patch("/api/admin/enrollments/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM enrollments WHERE id=?").get(id);
+  if (!cur) return res.status(404).json({ error: "not found" });
+  const allowed = ["name", "gender", "age", "email", "phone", "photo", "comment", "looking_for"];
+  const patch = {};
+  for (const k of allowed) if (k in req.body) patch[k] = req.body[k];
+  if (patch.photo !== undefined) patch.photo = validatePhoto(patch.photo);
+  if (!Object.keys(patch).length) return res.status(400).json({ error: "no fields" });
+  const sets = Object.keys(patch).map((k) => `${k}=?`).join(",");
+  db.prepare(`UPDATE enrollments SET ${sets} WHERE id=?`).run(...Object.values(patch), id);
+  log("admin", "patch_enrollment", { id, patch });
+  res.json({ ok: true, class: enrichClass(getClass(cur.class_id)) });
+});
+
+app.delete("/api/admin/enrollments/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM enrollments WHERE id=?").get(id);
+  if (!cur) return res.status(404).json({ error: "not found" });
+  db.prepare("DELETE FROM pairs WHERE leader_id=? OR follower_id=?").run(id, id);
+  db.prepare("DELETE FROM enrollments WHERE id=?").run(id);
+  log("admin", "del_enrollment", { id });
+  res.json({ ok: true, class: enrichClass(getClass(cur.class_id)) });
+});
+
+// --- Pairs ---
+app.post("/api/admin/pairs", (req, res) => {
+  try {
+    const { leader_id, follower_id, status = "proposed" } = req.body || {};
+    const a = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(leader_id));
+    const b = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(follower_id));
+    if (!a || !b) return res.status(404).json({ error: "enrollment not found" });
+    if (a.class_id !== b.class_id) return res.status(400).json({ error: "different classes" });
+    if (a.gender !== "L" || b.gender !== "F") return res.status(400).json({ error: "leader_id must be L, follower_id must be F" });
+    const r = db
+      .prepare("INSERT INTO pairs (class_id,leader_id,follower_id,status,created_at) VALUES (?,?,?,?,?)")
+      .run(a.class_id, a.id, b.id, status === "confirmed" ? "confirmed" : "proposed", Date.now());
+    log("admin", "create_pair", { id: r.lastInsertRowid });
+    res.json({ ok: true, id: r.lastInsertRowid, class: enrichClass(getClass(a.class_id)) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.patch("/api/admin/pairs/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM pairs WHERE id=?").get(id);
+  if (!cur) return res.status(404).json({ error: "not found" });
+  const { status } = req.body || {};
+  if (status !== "proposed" && status !== "confirmed") return res.status(400).json({ error: "invalid status" });
+  db.prepare("UPDATE pairs SET status=? WHERE id=?").run(status, id);
+  log("admin", "patch_pair", { id, status });
+  res.json({ ok: true, class: enrichClass(getClass(cur.class_id)) });
+});
+
+app.delete("/api/admin/pairs/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM pairs WHERE id=?").get(id);
+  if (!cur) return res.status(404).json({ error: "not found" });
+  db.prepare("DELETE FROM pairs WHERE id=?").run(id);
+  log("admin", "del_pair", { id });
+  res.json({ ok: true, class: enrichClass(getClass(cur.class_id)) });
+});
+
+// --- Reserved pairs ---
+app.post("/api/admin/reserved", (req, res) => {
+  try {
+    const { class_id, leader_nick, follower_nick, note } = req.body || {};
+    if (!class_id || !leader_nick || !follower_nick) return res.status(400).json({ error: "missing fields" });
+    if (!/^[A-Za-z]{2}$/.test(leader_nick) || !/^[A-Za-z]{2}$/.test(follower_nick))
+      return res.status(400).json({ error: "nicks must be 2 letters" });
+    const r = db
+      .prepare("INSERT INTO reserved_pairs (class_id,leader_nick,follower_nick,note) VALUES (?,?,?,?)")
+      .run(class_id, leader_nick.toUpperCase(), follower_nick.toUpperCase(), note || null);
+    log("admin", "add_reserved", { id: r.lastInsertRowid });
+    res.json({ ok: true, id: r.lastInsertRowid, class: enrichClass(getClass(class_id)) });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.delete("/api/admin/reserved/:id", (req, res) => {
+  const id = Number(req.params.id);
+  const cur = db.prepare("SELECT * FROM reserved_pairs WHERE id=?").get(id);
+  if (!cur) return res.status(404).json({ error: "not found" });
+  db.prepare("DELETE FROM reserved_pairs WHERE id=?").run(id);
+  log("admin", "del_reserved", { id });
+  res.json({ ok: true, class: enrichClass(getClass(cur.class_id)) });
 });
 
 app.listen(Number(PORT), () => {
