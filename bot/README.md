@@ -39,29 +39,43 @@ Restart: `docker compose restart`. You can now use admin commands.
 | Command | Description |
 |---|---|
 | `/start` | Show your chat ID and command list |
-| `/status` | Overview of all classes and current capacity |
-| `/block <id>` | Close enrollment for a class |
-| `/open <id>` | Re-open a class |
-| `/add_spot <id>` | Increase `max_capacity` by 1 |
-| `/set_capacity <id> <n>` | Set `max_capacity` directly |
-| `/list_enrollments <id>` | Last 30 sign-ups for a class |
+| `/status` | Overview: пары, M/Ж, capacity |
+| `/list <classId>` | Все заявки курса (с ID) |
+| `/add <classId> <L\|F> <name> [age]` | Добавить заявку (L=Leader/М, F=Follower/Ж) |
+| `/del <enrollmentId>` | Удалить заявку (и все её пары) |
+| `/match <leaderId> <followerId>` | Предложить пару (status=proposed) |
+| `/confirm <pairId>` | Подтвердить пару |
+| `/unpair <pairId>` | Удалить пару |
+| `/reserved <classId>` | Список постоянных пар |
+| `/add_reserved <classId> <LL> <FF> [note]` | Добавить пост. пару (2 буквы каждый) |
+| `/del_reserved <id>` | Удалить пост. пару |
+| `/block <id>` / `/open <id>` | Закрыть / открыть курс |
+| `/add_spot <id>` / `/set_capacity <id> <n>` | Изменить вместимость |
 
-Default class id after first start: `thu-2000-cubana` (Donnerstag 20:00).
-
-The bot also **pushes a notification** to every admin chat whenever a student
-signs up via the website.
+Default class id: `thu-2000-cubana` (Donnerstag 20:00).
+Бот **пушит уведомление** всем admin-чатам при каждой записи через сайт (с полом, возрастом и комментом).
 
 ## 4. REST API
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
-| GET | `/health` | — | Liveness check |
-| GET | `/api/classes` | — | List classes |
-| GET | `/api/classes/:id` | — | Get one class |
-| POST | `/api/enroll` | — | Public sign-up `{class_id,name,email,phone?}` |
-| PATCH | `/api/admin/classes/:id` | `X-Admin-Token` | Update fields |
-| POST | `/api/admin/classes` | `X-Admin-Token` | Create new class |
-| DELETE | `/api/admin/classes/:id` | `X-Admin-Token` | Remove class |
+| GET | `/health` | — | Liveness |
+| GET | `/api/classes` | — | Все курсы (enriched: enrollments, pairs, reserved, counts) |
+| GET | `/api/classes/:id` | — | Один курс |
+| POST | `/api/enroll` | — | `{class_id,name,gender:'L'\|'F',age?,email?,phone?,photo?,comment?}` |
+| PATCH | `/api/admin/classes/:id` | `X-Admin-Token` | Изменить курс |
+| POST | `/api/admin/classes` | token | Создать курс |
+| DELETE | `/api/admin/classes/:id` | token | Удалить курс |
+| POST | `/api/admin/enrollments` | token | Добавить заявку (как в /enroll) |
+| PATCH | `/api/admin/enrollments/:id` | token | Изменить заявку |
+| DELETE | `/api/admin/enrollments/:id` | token | Удалить заявку |
+| POST | `/api/admin/pairs` | token | `{leader_id,follower_id,status?}` |
+| PATCH | `/api/admin/pairs/:id` | token | `{status:'proposed'\|'confirmed'}` |
+| DELETE | `/api/admin/pairs/:id` | token | Удалить пару |
+| POST | `/api/admin/reserved` | token | `{class_id,leader_nick,follower_nick,note?}` |
+| DELETE | `/api/admin/reserved/:id` | token | Удалить пост. пару |
+
+`photo` — `data:image/jpeg;base64,...` (макс. ~800 KB) или `https://...` URL.
 
 ## 5. Connecting the Lovable frontend
 
