@@ -51,8 +51,8 @@ function Index() {
             mit AlmaLatina
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted-foreground">
-            Echtzeit-Verfügbarkeit für Tonys Salsa-Stunden. Sieh sofort, wie
-            viele Plätze noch frei sind — direkt synchronisiert über Telegram.
+            Echtzeit-Verfügbarkeit für Tonys Salsa-Stunden. Sieh sofort, wie viele Plätze noch frei
+            sind — direkt synchronisiert über Telegram.
           </p>
         </div>
       </section>
@@ -82,8 +82,10 @@ function Index() {
 
         {!live && (
           <p className="mt-6 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
-            ℹ <strong>Demo-Modus (Local).</strong> Telegram-Bot nicht verbunden — Daten werden nur in deinem Browser gespeichert.
-            Setze <code className="rounded bg-background/40 px-1">VITE_BOT_API_URL</code> auf deinen Docker-Bot, um live zu schalten.
+            ℹ <strong>Demo-Modus (Local).</strong> Telegram-Bot nicht verbunden — Daten werden nur
+            in deinem Browser gespeichert. Setze{" "}
+            <code className="rounded bg-background/40 px-1">VITE_BOT_API_URL</code> auf deinen
+            Docker-Bot, um live zu schalten.
           </p>
         )}
 

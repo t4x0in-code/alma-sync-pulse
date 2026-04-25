@@ -6,11 +6,13 @@
 ## Problem
 
 `bot/src/server.js` line 662:
+
 ```js
 app.delete("/api/admin/enrollments:id", ...)  // BUG — missing /
 ```
 
 Should be:
+
 ```js
 app.delete("/api/admin/enrollments/:id", ...)
 ```

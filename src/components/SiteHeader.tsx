@@ -20,7 +20,11 @@ export function SiteHeader({ live }: { live?: boolean }) {
           {live !== undefined && (
             <span
               className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground"
-              title={live ? "Live: Telegram-Bot verbunden" : "Local-Modus: Demo ohne Bot (Daten im Browser)"}
+              title={
+                live
+                  ? "Live: Telegram-Bot verbunden"
+                  : "Local-Modus: Demo ohne Bot (Daten im Browser)"
+              }
             >
               <span
                 className={`h-2 w-2 rounded-full ${
