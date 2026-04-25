@@ -1,0 +1,16 @@
+{
+  "name": "almalatina-bot",
+  "version": "1.0.0",
+  "description": "AlmaLatina Telegram bot + REST API (single source of truth for salsa classes)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "node-telegram-bot-api": "^0.66.0"
+  }
+}
