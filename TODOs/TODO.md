@@ -12,12 +12,13 @@
 
 ## P1 — Required features / correctness
 
-- [ ] [TODO-0100](./TODO-0100-supabase-realtime/) — Replace polling with Supabase Realtime / WebSocket
+- [ ] [TODO-0100](./TODO-0900-supabase-realtime/) — Replace polling with Supabase Realtime / WebSocket
 - [ ] [TODO-0101](./TODO-0101-student-self-edit/) — Student self-edit via magic-link
 - [ ] [TODO-0102](./TODO-0102-pair-confirmation-flow/) — Full two-sided pair confirmation flow
 - [ ] [TODO-0103](./TODO-0103-waitlist/) — Waitlist when course is full
 - [ ] [TODO-0104](./TODO-0104-multi-course-support/) — Multi-course & schedule support
 - [ ] [TODO-0106](./TODO-0106-telegram-webhook-mode/) — Switch bot from polling to webhook
+- [ ] [TODO-0107](./TODO-0107-class-crud/) — Class CRUD (add_class, set_class, class, list_classes)
 
 ## P2 — UX / quality
 
