@@ -18,6 +18,7 @@ import TelegramBot from "node-telegram-bot-api";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 import { createHmac, randomBytes } from "crypto";
+import { t, lang } from "./i18n.js";
 
 const {
   TELEGRAM_TOKEN,
@@ -60,6 +61,9 @@ setInterval(() => {
   const now = Date.now();
   for (const [id, v] of pendingAuth) if (v.expires < now) pendingAuth.delete(id);
 }, 60_000);
+
+// Stores language code per admin chat ID (populated on /start)
+const adminLangs = new Map();
 
 // ---------- DB ----------
 mkdirSync(dirname(DB_PATH), { recursive: true });
@@ -260,22 +264,21 @@ if (TELEGRAM_TOKEN) {
     adminChatIds.size === 0 || adminChatIds.has(String(msg.chat.id));
 
   bot.onText(/^\/start/, (msg) => {
-    bot.sendMessage(
-      msg.chat.id,
-      `🌹 *AlmaLatina Bot*\nDeine Chat-ID: \`${msg.chat.id}\`\n\nFüge sie zu ADMIN_CHAT_IDS hinzu, um Befehle zu nutzen.\n\n*Befehle:*\n/status — Übersicht (M/Ж, пары)\n/list <id> — все заявки\n/add <id> <L|F> <name> [age] — добавить заявку\n/del <enrollmentId>\n/match <leaderId> <followerId> — предложить пару\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [note]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>`,
-      { parse_mode: "Markdown" },
-    );
+    const l = lang(msg.from);
+    adminLangs.set(String(msg.chat.id), l);
+    bot.sendMessage(msg.chat.id, t(l, "start", { chatId: msg.chat.id }), { parse_mode: "Markdown" });
   });
 
   bot.onText(/^\/status/, (msg) => {
-    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, "🚫 Kein Zugriff.");
+    const l = lang(msg.from);
+    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(l, "no_access"));
     const rows = listClasses();
-    if (!rows.length) return bot.sendMessage(msg.chat.id, "Keine Kurse.");
+    if (!rows.length) return bot.sendMessage(msg.chat.id, t(l, "no_courses"));
     const txt = rows
       .map((c) => {
         const confirmed = c.pairs.filter((p) => p.status === "confirmed").length;
         const proposed = c.pairs.filter((p) => p.status === "proposed").length;
-        return `*${c.title}* \`${c.id}\`\n${c.schedule}\n👥 ${c.current_enrollment}/${c.max_capacity} · ${c.status}\n💃 F: ${c.counts_by_gender.F}  🕺 L: ${c.counts_by_gender.L}\n💞 пары: ${confirmed} ✓ / ${proposed} ?\n🔒 reserved: ${c.reserved.length}`;
+        return t(l, "status_line", { title: c.title, id: c.id, schedule: c.schedule, enrolled: c.current_enrollment, cap: c.max_capacity, status: c.status, f: c.counts_by_gender.F, l: c.counts_by_gender.L, confirmed, proposed, reserved: c.reserved.length });
       })
       .join("\n\n");
     bot.sendMessage(msg.chat.id, txt, { parse_mode: "Markdown" });
@@ -283,7 +286,7 @@ if (TELEGRAM_TOKEN) {
 
   const guard = (msg) => {
     if (!isAdmin(msg)) {
-      bot.sendMessage(msg.chat.id, "🚫 Kein Zugriff.");
+      bot.sendMessage(msg.chat.id, t(lang(msg.from), "no_access"));
       return false;
     }
     return true;
@@ -291,10 +294,11 @@ if (TELEGRAM_TOKEN) {
 
   bot.onText(/^\/list\s+(\S+)/, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const c = getClass(m[1]);
-    if (!c) return bot.sendMessage(msg.chat.id, "❌ Kurs nicht gefunden.");
+    if (!c) return bot.sendMessage(msg.chat.id, t(l, "course_not_found"));
     const en = listEnrollments(c.id);
-    if (!en.length) return bot.sendMessage(msg.chat.id, "Noch keine Anmeldungen.");
+    if (!en.length) return bot.sendMessage(msg.chat.id, t(l, "no_enrollments"));
     const txt = en
       .map(
         (r) =>
@@ -306,36 +310,39 @@ if (TELEGRAM_TOKEN) {
 
   bot.onText(/^\/add\s+(\S+)\s+(L|F)\s+(.+?)(?:\s+(\d{1,3}))?$/i, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const [, classId, g, name, age] = m;
     const c = getClass(classId);
-    if (!c) return bot.sendMessage(msg.chat.id, "❌ Kurs nicht gefunden.");
+    if (!c) return bot.sendMessage(msg.chat.id, t(l, "course_not_found"));
     const r = db
       .prepare(
         "INSERT INTO enrollments (class_id,name,gender,age,source,created_at) VALUES (?,?,?,?,?,?)",
       )
       .run(classId, name.trim(), g.toUpperCase(), age ? Number(age) : null, `tg:${msg.chat.id}`, Date.now());
     log(`tg:${msg.chat.id}`, "add_enrollment", { classId, id: r.lastInsertRowid });
-    bot.sendMessage(msg.chat.id, `✅ #${r.lastInsertRowid} hinzugefügt.`);
+    bot.sendMessage(msg.chat.id, t(l, "added", { id: r.lastInsertRowid }));
   });
 
   bot.onText(/^\/del\s+(\d+)/, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const id = Number(m[1]);
     db.prepare("DELETE FROM pairs WHERE leader_id=? OR follower_id=?").run(id, id);
     const r = db.prepare("DELETE FROM enrollments WHERE id=?").run(id);
     log(`tg:${msg.chat.id}`, "del_enrollment", { id });
-    bot.sendMessage(msg.chat.id, r.changes ? `🗑 #${id} entfernt.` : "❌ nicht gefunden.");
+    bot.sendMessage(msg.chat.id, r.changes ? t(l, "deleted", { id }) : t(l, "not_found"));
   });
 
   bot.onText(/^\/match\s+(\d+)\s+(\d+)/, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const a = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[1]));
     const b = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[2]));
-    if (!a || !b) return bot.sendMessage(msg.chat.id, "❌ Anmeldungen nicht gefunden.");
-    if (a.class_id !== b.class_id) return bot.sendMessage(msg.chat.id, "❌ verschiedene Kurse.");
+    if (!a || !b) return bot.sendMessage(msg.chat.id, t(l, "enrollment_not_found"));
+    if (a.class_id !== b.class_id) return bot.sendMessage(msg.chat.id, t(l, "different_courses"));
     const leader = a.gender === "L" ? a : b.gender === "L" ? b : null;
     const follower = a.gender === "F" ? a : b.gender === "F" ? b : null;
-    if (!leader || !follower) return bot.sendMessage(msg.chat.id, "❌ нужны 1×L и 1×F.");
+    if (!leader || !follower) return bot.sendMessage(msg.chat.id, t(l, "need_l_f"));
     try {
       const r = db
         .prepare(
@@ -343,7 +350,7 @@ if (TELEGRAM_TOKEN) {
         )
         .run(a.class_id, leader.id, follower.id, "proposed", Date.now());
       log(`tg:${msg.chat.id}`, "match", { id: r.lastInsertRowid });
-      bot.sendMessage(msg.chat.id, `💞 пара #${r.lastInsertRowid}: ${leader.name} ↔ ${follower.name} (proposed)`);
+      bot.sendMessage(msg.chat.id, t(l, "pair_proposed", { id: r.lastInsertRowid, leader: leader.name, follower: follower.name }));
     } catch (e) {
       bot.sendMessage(msg.chat.id, `❌ ${e.message}`);
     }
@@ -351,22 +358,25 @@ if (TELEGRAM_TOKEN) {
 
   bot.onText(/^\/confirm\s+(\d+)/, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const r = db.prepare("UPDATE pairs SET status='confirmed' WHERE id=?").run(Number(m[1]));
     log(`tg:${msg.chat.id}`, "confirm_pair", { id: Number(m[1]) });
-    bot.sendMessage(msg.chat.id, r.changes ? `✓ пара ${m[1]} подтверждена.` : "❌ не найдена.");
+    bot.sendMessage(msg.chat.id, r.changes ? t(l, "pair_confirmed", { id: m[1] }) : t(l, "pair_not_found"));
   });
 
   bot.onText(/^\/unpair\s+(\d+)/, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const r = db.prepare("DELETE FROM pairs WHERE id=?").run(Number(m[1]));
     log(`tg:${msg.chat.id}`, "unpair", { id: Number(m[1]) });
-    bot.sendMessage(msg.chat.id, r.changes ? `🗑 пара ${m[1]} удалена.` : "❌ не найдена.");
+    bot.sendMessage(msg.chat.id, r.changes ? t(l, "pair_deleted", { id: m[1] }) : t(l, "pair_not_found"));
   });
 
   bot.onText(/^\/reserved\s+(\S+)/, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const rows = listReserved(m[1]);
-    if (!rows.length) return bot.sendMessage(msg.chat.id, "Keine reservierten Paare.");
+    if (!rows.length) return bot.sendMessage(msg.chat.id, t(l, "no_reserved"));
     bot.sendMessage(
       msg.chat.id,
       rows.map((r) => `#${r.id} 🔒 ${r.leader_nick}–${r.follower_nick}${r.note ? ` · ${r.note}` : ""}`).join("\n"),
@@ -375,15 +385,16 @@ if (TELEGRAM_TOKEN) {
 
   bot.onText(/^\/add_reserved\s+(\S+)\s+([A-Za-z]{2})\s+([A-Za-z]{2})(?:\s+(.+))?$/, (msg, m) => {
     if (!guard(msg)) return;
-    const [, classId, l, f, note] = m;
+    const l = lang(msg.from);
+    const [, classId, lNick, f, note] = m;
     try {
       const r = db
         .prepare(
           "INSERT INTO reserved_pairs (class_id,leader_nick,follower_nick,note) VALUES (?,?,?,?)",
         )
-        .run(classId, l.toUpperCase(), f.toUpperCase(), note || null);
+        .run(classId, lNick.toUpperCase(), f.toUpperCase(), note || null);
       log(`tg:${msg.chat.id}`, "add_reserved", { id: r.lastInsertRowid });
-      bot.sendMessage(msg.chat.id, `🔒 reserved #${r.lastInsertRowid}: ${l.toUpperCase()}–${f.toUpperCase()}`);
+      bot.sendMessage(msg.chat.id, t(l, "reserved_added", { id: r.lastInsertRowid, l: lNick.toUpperCase(), f: f.toUpperCase() }));
     } catch (e) {
       bot.sendMessage(msg.chat.id, `❌ ${e.message}`);
     }
@@ -391,9 +402,10 @@ if (TELEGRAM_TOKEN) {
 
   bot.onText(/^\/del_reserved\s+(\d+)/, (msg, m) => {
     if (!guard(msg)) return;
+    const l = lang(msg.from);
     const r = db.prepare("DELETE FROM reserved_pairs WHERE id=?").run(Number(m[1]));
     log(`tg:${msg.chat.id}`, "del_reserved", { id: Number(m[1]) });
-    bot.sendMessage(msg.chat.id, r.changes ? `🗑 reserved ${m[1]} entfernt.` : "❌ nicht gefunden.");
+    bot.sendMessage(msg.chat.id, r.changes ? t(l, "reserved_deleted", { id: m[1] }) : t(l, "not_found"));
   });
 
   // Class admin
@@ -401,50 +413,51 @@ if (TELEGRAM_TOKEN) {
     bot.onText(re, (msg, m) => {
       if (!guard(msg)) return;
       const c = getClass(m[1]);
-      if (!c) return bot.sendMessage(msg.chat.id, `❌ Kurs ${m[1]} nicht gefunden.`);
+      if (!c) return bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_not_found_id", { id: m[1] }));
       fn(msg, c, m);
     });
 
   cmdWithId(/^\/block\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET status='closed' WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "block", { id: c.id });
-    bot.sendMessage(msg.chat.id, `🔒 ${c.title} geschlossen.`);
+    bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_closed", { title: c.title }));
   });
   cmdWithId(/^\/open\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET status='open' WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "open", { id: c.id });
-    bot.sendMessage(msg.chat.id, `🔓 ${c.title} geöffnet.`);
+    bot.sendMessage(msg.chat.id, t(lang(msg.from), "course_opened", { title: c.title }));
   });
   cmdWithId(/^\/add_spot\s+(\S+)/, (msg, c) => {
     db.prepare("UPDATE classes SET max_capacity=max_capacity+1 WHERE id=?").run(c.id);
     log(`tg:${msg.chat.id}`, "add_spot", { id: c.id });
-    bot.sendMessage(msg.chat.id, `➕ ${c.title}: ${c.max_capacity + 1} Plätze.`);
+    bot.sendMessage(msg.chat.id, t(lang(msg.from), "spot_added", { title: c.title, n: c.max_capacity + 1 }));
   });
   cmdWithId(/^\/set_capacity\s+(\S+)\s+(\d+)/, (msg, c, m) => {
     const n = parseInt(m[2], 10);
     db.prepare("UPDATE classes SET max_capacity=? WHERE id=?").run(n, c.id);
     log(`tg:${msg.chat.id}`, "set_capacity", { id: c.id, n });
-    bot.sendMessage(msg.chat.id, `📏 ${c.title}: max ${n}`);
+    bot.sendMessage(msg.chat.id, t(lang(msg.from), "capacity_set", { title: c.title, n }));
   });
 
   bot.on("callback_query", (q) => {
+    const l = lang(q.from);
     const [ns, action, requestId] = (q.data ?? "").split(":");
     if (ns !== "auth") return bot.answerCallbackQuery(q.id);
     const entry = pendingAuth.get(requestId);
     if (!entry || entry.expires < Date.now()) {
       pendingAuth.delete(requestId);
-      bot.answerCallbackQuery(q.id, { text: "Anfrage abgelaufen." });
-      return bot.editMessageText("⏱ Abgelaufen.", { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      bot.answerCallbackQuery(q.id, { text: t(l, "auth_expired_cb") });
+      return bot.editMessageText(t(l, "auth_expired_msg"), { chat_id: q.message.chat.id, message_id: q.message.message_id });
     }
     if (action === "ok") {
       entry.jwt = signAdminJwt();
       entry.status = "ok";
-      bot.answerCallbackQuery(q.id, { text: "✅ Login bestätigt!" });
-      bot.editMessageText("✅ Login bestätigt.", { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      bot.answerCallbackQuery(q.id, { text: t(l, "auth_confirmed_cb") });
+      bot.editMessageText(t(l, "auth_confirmed_msg"), { chat_id: q.message.chat.id, message_id: q.message.message_id });
     } else {
       entry.status = "denied";
-      bot.answerCallbackQuery(q.id, { text: "❌ Abgelehnt." });
-      bot.editMessageText("❌ Login abgelehnt.", { chat_id: q.message.chat.id, message_id: q.message.message_id });
+      bot.answerCallbackQuery(q.id, { text: t(l, "auth_denied_cb") });
+      bot.editMessageText(t(l, "auth_denied_msg"), { chat_id: q.message.chat.id, message_id: q.message.message_id });
     }
   });
 } else {
@@ -454,7 +467,9 @@ if (TELEGRAM_TOKEN) {
 const notifyAdmins = (text) => {
   if (!bot) return;
   for (const chatId of adminChatIds) {
-    bot.sendMessage(chatId, text, { parse_mode: "Markdown" }).catch(() => {});
+    const al = adminLangs.get(chatId) ?? "en";
+    const msg = typeof text === "function" ? text(al) : text;
+    bot.sendMessage(chatId, msg, { parse_mode: "Markdown" }).catch(() => {});
   }
 };
 
@@ -515,9 +530,14 @@ app.post("/api/enroll", (req, res) => {
       );
 
     log("web", "enroll", { class_id, id: r.lastInsertRowid });
-    notifyAdmins(
-      `🌹 *Neue Anmeldung* (${gender === "L" ? "🕺 Leader" : "💃 Follower"})\n*${name}*${age ? `, ${age}` : ""}${comment ? `\n_${comment}_` : ""}\n→ *${c.title}*\nID #${r.lastInsertRowid}`,
-    );
+    notifyAdmins((al) => t(al, "notify_enroll", {
+      role: gender === "L" ? "🕺 Leader" : "💃 Follower",
+      name,
+      age: age ? `, ${age}` : "",
+      comment: comment ? `\n_${comment}_` : "",
+      title: c.title,
+      id: r.lastInsertRowid,
+    }));
     res.json({ ok: true, enrollment_id: r.lastInsertRowid, class: enrichClass(c) });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -532,8 +552,9 @@ app.post("/api/auth/request", (req, res) => {
   const pin = String(Math.floor(100000 + Math.random() * 900000));
   pendingAuth.set(requestId, { pin, status: "pending", jwt: null, expires: Date.now() + 10 * 60 * 1000 });
   for (const chatId of adminChatIds) {
+    const al = adminLangs.get(chatId) ?? "en";
     bot.sendMessage(chatId,
-      `🔐 *Admin-Login angefragt*\nPIN: \`${pin}\`\n\nBestätige nur, wenn du selbst gerade einloggst.`,
+      t(al, "auth_request", { pin }),
       { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[
         { text: "✅ Bestätigen", callback_data: `auth:ok:${requestId}` },
         { text: "❌ Ablehnen",   callback_data: `auth:deny:${requestId}` },
