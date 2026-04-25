@@ -82,7 +82,8 @@ function Index() {
 
         {!live && (
           <p className="mt-6 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
-            ⚠ Bot-API offline (zeige Demo-Daten). Starte den Docker-Bot, um Live-Daten zu sehen.
+            ℹ <strong>Demo-Modus (Local).</strong> Telegram-Bot nicht verbunden — Daten werden nur in deinem Browser gespeichert.
+            Setze <code className="rounded bg-background/40 px-1">VITE_BOT_API_URL</code> auf deinen Docker-Bot, um live zu schalten.
           </p>
         )}
 

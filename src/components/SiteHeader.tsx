@@ -18,13 +18,16 @@ export function SiteHeader({ live }: { live?: boolean }) {
             almalatina.de
           </a>
           {live !== undefined && (
-            <span className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+            <span
+              className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground"
+              title={live ? "Live: Telegram-Bot verbunden" : "Local-Modus: Demo ohne Bot (Daten im Browser)"}
+            >
               <span
                 className={`h-2 w-2 rounded-full ${
-                  live ? "bg-success animate-pulse-dot" : "bg-muted-foreground"
+                  live ? "bg-success animate-pulse-dot" : "bg-warning"
                 }`}
               />
-              {live ? "Live" : "Offline"}
+              {live ? "Live" : "Local"}
             </span>
           )}
         </nav>

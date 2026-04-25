@@ -1,9 +1,12 @@
 // Client for the standalone AlmaLatina Telegram-bot REST API.
-// Configure via VITE_BOT_API_URL (default: http://localhost:8080).
+// Configure via VITE_BOT_API_URL. If unset OR the bot is unreachable,
+// the client transparently falls back to a local in-browser store
+// (src/lib/localStore.ts) so the prototype works fully without the bot.
 
-export const API_BASE =
-  (import.meta.env.VITE_BOT_API_URL as string | undefined) ??
-  "http://localhost:8080";
+import { localApi } from "./localStore";
+
+const RAW_BASE = (import.meta.env.VITE_BOT_API_URL as string | undefined)?.trim();
+export const API_BASE = RAW_BASE && RAW_BASE.length > 0 ? RAW_BASE : null;
 
 export type ClassStatus = "open" | "limited" | "closed";
 export type Gender = "L" | "F"; // L = Leader (М), F = Follower (Ж)
@@ -68,115 +71,212 @@ export interface EnrollPayload {
   comment?: string;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`API ${res.status}: ${text || res.statusText}`);
-  }
-  return res.json() as Promise<T>;
+// ---------- Mode tracking ----------
+
+export type ApiMode = "live" | "local";
+
+let mode: ApiMode = API_BASE ? "live" : "local";
+const listeners = new Set<(m: ApiMode) => void>();
+
+export function getMode(): ApiMode {
+  return mode;
 }
 
-const adminHeaders = (token: string) => ({ "X-Admin-Token": token });
+export function onModeChange(fn: (m: ApiMode) => void) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function setMode(next: ApiMode) {
+  if (mode === next) return;
+  mode = next;
+  listeners.forEach((fn) => fn(next));
+}
+
+// ---------- HTTP wrapper with auto-fallback ----------
+
+async function httpRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!API_BASE) throw new Error("no api base");
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: ctrl.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`API ${res.status}: ${text || res.statusText}`);
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Try the live HTTP endpoint first. If the network call itself fails
+ * (TypeError "Failed to fetch", AbortError, DNS, CORS, etc.) we permanently
+ * switch to the local store for this session and re-run the operation
+ * against the local fallback. Real HTTP errors (4xx/5xx) bubble up.
+ */
+async function withFallback<T>(
+  http: () => Promise<T>,
+  local: () => T | Promise<T>,
+): Promise<T> {
+  if (mode === "local" || !API_BASE) return Promise.resolve(local());
+  try {
+    return await http();
+  } catch (e) {
+    const isNetworkError =
+      e instanceof TypeError ||
+      (e instanceof DOMException && e.name === "AbortError") ||
+      (e instanceof Error && /no api base|Failed to fetch|NetworkError/i.test(e.message));
+    if (isNetworkError) {
+      console.warn("[AlmaLatina] Bot unreachable, switching to local mode.");
+      setMode("local");
+      return Promise.resolve(local());
+    }
+    throw e;
+  }
+}
+
+// ---------- Public API ----------
 
 export const api = {
-  listClasses: () => request<SalsaClass[]>("/api/classes"),
-  getClass: (id: string) => request<SalsaClass>(`/api/classes/${id}`),
+  listClasses: () =>
+    withFallback<SalsaClass[]>(
+      () => httpRequest("/api/classes"),
+      () => localApi.listClasses(),
+    ),
+  getClass: (id: string) =>
+    withFallback<SalsaClass>(
+      () => httpRequest(`/api/classes/${id}`),
+      () => localApi.getClass(id),
+    ),
   enroll: (data: EnrollPayload) =>
-    request<{ ok: true; enrollment_id: number; class: SalsaClass }>("/api/enroll", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    withFallback<{ ok: true; enrollment_id: number; class: SalsaClass }>(
+      () =>
+        httpRequest("/api/enroll", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      () => localApi.enroll(data),
+    ),
   admin: {
     updateClass: (id: string, patch: Partial<SalsaClass>, token: string) =>
-      request<SalsaClass>(`/api/admin/classes/${id}`, {
-        method: "PATCH",
-        headers: adminHeaders(token),
-        body: JSON.stringify(patch),
-      }),
+      withFallback<SalsaClass>(
+        () =>
+          httpRequest(`/api/admin/classes/${id}`, {
+            method: "PATCH",
+            headers: { "X-Admin-Token": token },
+            body: JSON.stringify(patch),
+          }),
+        () => localApi.updateClass(id, patch),
+      ),
     deleteEnrollment: (id: number, token: string) =>
-      request<{ ok: true; class: SalsaClass }>(`/api/admin/enrollments/${id}`, {
-        method: "DELETE",
-        headers: adminHeaders(token),
-      }),
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; class: SalsaClass }>(
+            `/api/admin/enrollments/${id}`,
+            { method: "DELETE", headers: { "X-Admin-Token": token } },
+          ),
+        () => localApi.deleteEnrollment(id),
+      ),
     updateEnrollment: (id: number, patch: Partial<Enrollment>, token: string) =>
-      request<{ ok: true; class: SalsaClass }>(`/api/admin/enrollments/${id}`, {
-        method: "PATCH",
-        headers: adminHeaders(token),
-        body: JSON.stringify(patch),
-      }),
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; class: SalsaClass }>(
+            `/api/admin/enrollments/${id}`,
+            {
+              method: "PATCH",
+              headers: { "X-Admin-Token": token },
+              body: JSON.stringify(patch),
+            },
+          ),
+        () => localApi.updateEnrollment(id, patch),
+      ),
     addEnrollment: (data: EnrollPayload, token: string) =>
-      request<{ ok: true; id: number; class: SalsaClass }>(`/api/admin/enrollments`, {
-        method: "POST",
-        headers: adminHeaders(token),
-        body: JSON.stringify(data),
-      }),
-    createPair: (leader_id: number, follower_id: number, token: string, status: PairStatus = "proposed") =>
-      request<{ ok: true; id: number; class: SalsaClass }>(`/api/admin/pairs`, {
-        method: "POST",
-        headers: adminHeaders(token),
-        body: JSON.stringify({ leader_id, follower_id, status }),
-      }),
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; id: number; class: SalsaClass }>(
+            `/api/admin/enrollments`,
+            {
+              method: "POST",
+              headers: { "X-Admin-Token": token },
+              body: JSON.stringify(data),
+            },
+          ),
+        () => localApi.addEnrollment(data),
+      ),
+    createPair: (
+      leader_id: number,
+      follower_id: number,
+      token: string,
+      status: PairStatus = "proposed",
+    ) =>
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; id: number; class: SalsaClass }>(
+            `/api/admin/pairs`,
+            {
+              method: "POST",
+              headers: { "X-Admin-Token": token },
+              body: JSON.stringify({ leader_id, follower_id, status }),
+            },
+          ),
+        () => localApi.createPair(leader_id, follower_id, status),
+      ),
     setPairStatus: (id: number, status: PairStatus, token: string) =>
-      request<{ ok: true; class: SalsaClass }>(`/api/admin/pairs/${id}`, {
-        method: "PATCH",
-        headers: adminHeaders(token),
-        body: JSON.stringify({ status }),
-      }),
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; class: SalsaClass }>(`/api/admin/pairs/${id}`, {
+            method: "PATCH",
+            headers: { "X-Admin-Token": token },
+            body: JSON.stringify({ status }),
+          }),
+        () => localApi.setPairStatus(id, status),
+      ),
     deletePair: (id: number, token: string) =>
-      request<{ ok: true; class: SalsaClass }>(`/api/admin/pairs/${id}`, {
-        method: "DELETE",
-        headers: adminHeaders(token),
-      }),
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; class: SalsaClass }>(`/api/admin/pairs/${id}`, {
+            method: "DELETE",
+            headers: { "X-Admin-Token": token },
+          }),
+        () => localApi.deletePair(id),
+      ),
     addReserved: (
       data: { class_id: string; leader_nick: string; follower_nick: string; note?: string },
       token: string,
     ) =>
-      request<{ ok: true; id: number; class: SalsaClass }>(`/api/admin/reserved`, {
-        method: "POST",
-        headers: adminHeaders(token),
-        body: JSON.stringify(data),
-      }),
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; id: number; class: SalsaClass }>(
+            `/api/admin/reserved`,
+            {
+              method: "POST",
+              headers: { "X-Admin-Token": token },
+              body: JSON.stringify(data),
+            },
+          ),
+        () => localApi.addReserved(data),
+      ),
     deleteReserved: (id: number, token: string) =>
-      request<{ ok: true; class: SalsaClass }>(`/api/admin/reserved/${id}`, {
-        method: "DELETE",
-        headers: adminHeaders(token),
-      }),
+      withFallback(
+        () =>
+          httpRequest<{ ok: true; class: SalsaClass }>(
+            `/api/admin/reserved/${id}`,
+            { method: "DELETE", headers: { "X-Admin-Token": token } },
+          ),
+        () => localApi.deleteReserved(id),
+      ),
   },
 };
 
-// Mock fallback so the UI works before the bot is running.
-export const MOCK_CLASSES: SalsaClass[] = [
-  {
-    id: "thu-2000-cubana",
-    title: "Salsa Cubana — Open Level",
-    instructor: "Tony",
-    schedule: "Donnerstag · 20:00 – 21:30",
-    max_capacity: 20,
-    current_enrollment: 4,
-    status: "open",
-    external_url: "https://almalatina.de/",
-    description: "Wöchentlicher Kurs für alle Levels. Authentische kubanische Salsa mit Tony.",
-    counts_by_gender: { L: 2, F: 2 },
-    enrollments: [
-      { id: 1, class_id: "thu-2000-cubana", name: "Marco", gender: "L", age: 32, email: null, phone: null, photo: null, comment: "Anfänger, suche Partnerin", looking_for: null, source: "web", created_at: Date.now() },
-      { id: 2, class_id: "thu-2000-cubana", name: "Elena", gender: "F", age: 28, email: null, phone: null, photo: null, comment: "Salsera seit 2 Jahren", looking_for: null, source: "web", created_at: Date.now() },
-      { id: 3, class_id: "thu-2000-cubana", name: "Pablo", gender: "L", age: 41, email: null, phone: null, photo: null, comment: null, looking_for: null, source: "web", created_at: Date.now() },
-      { id: 4, class_id: "thu-2000-cubana", name: "Sofía", gender: "F", age: 35, email: null, phone: null, photo: null, comment: "Ich suche Marco 😊", looking_for: null, source: "web", created_at: Date.now() },
-    ],
-    pairs: [
-      { id: 1, class_id: "thu-2000-cubana", leader_id: 1, follower_id: 4, status: "proposed", created_at: Date.now() },
-    ],
-    reserved: [
-      { id: 1, class_id: "thu-2000-cubana", leader_nick: "TO", follower_nick: "MA", note: "Tony & Maria" },
-      { id: 2, class_id: "thu-2000-cubana", leader_nick: "RA", follower_nick: "EL", note: "Rafael & Elena" },
-      { id: 3, class_id: "thu-2000-cubana", leader_nick: "JO", follower_nick: "AN", note: "José & Ana" },
-    ],
-  },
-];
+// Mock fallback (used by useClasses initial state).
+export const MOCK_CLASSES: SalsaClass[] = [];
