@@ -34,6 +34,9 @@ const T = {
     auth_denied_cb: "❌ Denied.",
     auth_denied_msg: "❌ Login denied.",
     auth_request: "🔐 *Admin login requested*\nPIN: `{pin}`\n\nConfirm only if you are the one logging in.",
+    auth_confirm_btn: "✅ Confirm",
+    auth_deny_btn: "❌ Deny",
+    db_error: "❌ Operation failed.",
     notify_enroll: "🌹 *New enrollment* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 
@@ -69,6 +72,9 @@ const T = {
     auth_denied_cb: "❌ Abgelehnt.",
     auth_denied_msg: "❌ Login abgelehnt.",
     auth_request: "🔐 *Admin-Login angefragt*\nPIN: `{pin}`\n\nBestätige nur, wenn du selbst gerade einloggst.",
+    auth_confirm_btn: "✅ Bestätigen",
+    auth_deny_btn: "❌ Ablehnen",
+    db_error: "❌ Vorgang fehlgeschlagen.",
     notify_enroll: "🌹 *Neue Anmeldung* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 
@@ -104,6 +110,9 @@ const T = {
     auth_denied_cb: "❌ Отклонено.",
     auth_denied_msg: "❌ Вход отклонён.",
     auth_request: "🔐 *Запрос на вход в админку*\nPIN: `{pin}`\n\nПодтвердите только если вы сами сейчас входите.",
+    auth_confirm_btn: "✅ Подтвердить",
+    auth_deny_btn: "❌ Отклонить",
+    db_error: "❌ Операция не выполнена.",
     notify_enroll: "🌹 *Новая заявка* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 
@@ -139,6 +148,9 @@ const T = {
     auth_denied_cb: "❌ Відхилено.",
     auth_denied_msg: "❌ Вхід відхилено.",
     auth_request: "🔐 *Запит на вхід в адмінку*\nPIN: `{pin}`\n\nПідтвердіть тільки якщо ви самі зараз входите.",
+    auth_confirm_btn: "✅ Підтвердити",
+    auth_deny_btn: "❌ Відхилити",
+    db_error: "❌ Операцію не виконано.",
     notify_enroll: "🌹 *Нова заявка* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 
@@ -174,6 +186,9 @@ const T = {
     auth_denied_cb: "❌ Refusée.",
     auth_denied_msg: "❌ Connexion refusée.",
     auth_request: "🔐 *Connexion admin demandée*\nPIN: `{pin}`\n\nConfirmez uniquement si c'est vous qui vous connectez.",
+    auth_confirm_btn: "✅ Confirmer",
+    auth_deny_btn: "❌ Refuser",
+    db_error: "❌ Opération échouée.",
     notify_enroll: "🌹 *Nouvelle inscription* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 
@@ -209,6 +224,9 @@ const T = {
     auth_denied_cb: "❌ Reddedildi.",
     auth_denied_msg: "❌ Giriş reddedildi.",
     auth_request: "🔐 *Admin girişi talep edildi*\nPIN: `{pin}`\n\nYalnızca kendiniz giriş yapıyorsanız onaylayın.",
+    auth_confirm_btn: "✅ Onayla",
+    auth_deny_btn: "❌ Reddet",
+    db_error: "❌ İşlem başarısız.",
     notify_enroll: "🌹 *Yeni kayıt* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 
@@ -244,6 +262,9 @@ const T = {
     auth_denied_cb: "❌ Rifiutato.",
     auth_denied_msg: "❌ Accesso rifiutato.",
     auth_request: "🔐 *Accesso admin richiesto*\nPIN: `{pin}`\n\nConferma solo se sei tu ad effettuare l'accesso.",
+    auth_confirm_btn: "✅ Conferma",
+    auth_deny_btn: "❌ Nega",
+    db_error: "❌ Operazione fallita.",
     notify_enroll: "🌹 *Nuova iscrizione* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 
@@ -279,6 +300,9 @@ const T = {
     auth_denied_cb: "❌ Rechazado.",
     auth_denied_msg: "❌ Inicio de sesión rechazado.",
     auth_request: "🔐 *Solicitud de acceso admin*\nPIN: `{pin}`\n\nConfirma solo si eres tú quien está iniciando sesión.",
+    auth_confirm_btn: "✅ Confirmar",
+    auth_deny_btn: "❌ Denegar",
+    db_error: "❌ Operación fallida.",
     notify_enroll: "🌹 *Nueva inscripción* ({role})\n*{name}*{age}{comment}\n→ *{title}*\nID #{id}",
   },
 };

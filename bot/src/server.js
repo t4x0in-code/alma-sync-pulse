@@ -352,7 +352,8 @@ if (TELEGRAM_TOKEN) {
       log(`tg:${msg.chat.id}`, "match", { id: r.lastInsertRowid });
       bot.sendMessage(msg.chat.id, t(l, "pair_proposed", { id: r.lastInsertRowid, leader: leader.name, follower: follower.name }));
     } catch (e) {
-      bot.sendMessage(msg.chat.id, `❌ ${e.message}`);
+      console.error("match error:", e.message);
+      bot.sendMessage(msg.chat.id, t(l, "db_error"));
     }
   });
 
@@ -396,7 +397,8 @@ if (TELEGRAM_TOKEN) {
       log(`tg:${msg.chat.id}`, "add_reserved", { id: r.lastInsertRowid });
       bot.sendMessage(msg.chat.id, t(l, "reserved_added", { id: r.lastInsertRowid, l: lNick.toUpperCase(), f: f.toUpperCase() }));
     } catch (e) {
-      bot.sendMessage(msg.chat.id, `❌ ${e.message}`);
+      console.error("add_reserved error:", e.message);
+      bot.sendMessage(msg.chat.id, t(l, "db_error"));
     }
   });
 
@@ -556,10 +558,10 @@ app.post("/api/auth/request", (req, res) => {
     bot.sendMessage(chatId,
       t(al, "auth_request", { pin }),
       { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[
-        { text: "✅ Bestätigen", callback_data: `auth:ok:${requestId}` },
-        { text: "❌ Ablehnen",   callback_data: `auth:deny:${requestId}` },
+        { text: t(al, "auth_confirm_btn"), callback_data: `auth:ok:${requestId}` },
+        { text: t(al, "auth_deny_btn"),   callback_data: `auth:deny:${requestId}` },
       ]] } }
-    );
+    ).catch(() => {});
   }
   res.json({ requestId, pin });
 });
@@ -651,6 +653,8 @@ app.patch("/api/admin/enrollments/:id", (req, res) => {
   const allowed = ["name", "gender", "age", "email", "phone", "photo", "comment", "looking_for"];
   const patch = {};
   for (const k of allowed) if (k in req.body) patch[k] = req.body[k];
+  if (patch.gender !== undefined && patch.gender !== "L" && patch.gender !== "F")
+    return res.status(400).json({ error: "invalid gender" });
   if (patch.photo !== undefined) patch.photo = validatePhoto(patch.photo);
   if (!Object.keys(patch).length) return res.status(400).json({ error: "no fields" });
   const sets = Object.keys(patch).map((k) => `${k}=?`).join(",");
