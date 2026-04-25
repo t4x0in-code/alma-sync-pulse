@@ -727,3 +727,75 @@ describe("REGRESSION: all 72 i18n keys exist and process correctly", () => {
     expect(t(msg, "role_F")).toBe("💃 Follower");
   });
 });
+
+describe("REGRESSION: sequential /add command (wizard flow)", () => {
+  let adminLangs;
+
+  beforeEach(() => {
+    adminLangs = new Map();
+    initI18n(adminLangs);
+  });
+
+  // Sequential add i18n keys
+  it("add_wizard_select_class prompt exists", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "add_wizard_select_class")).toBeDefined();
+  });
+
+  it("add_wizard_gender prompt exists", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "add_wizard_gender")).toContain("gender");
+  });
+
+  it("add_wizard_name prompt exists", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "add_wizard_name")).toContain("name");
+  });
+
+  it("add_wizard_age prompt exists", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "add_wizard_age")).toContain("age");
+  });
+
+  it("add_wizard_photo prompt exists", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "add_wizard_photo")).toContain("photo");
+  });
+
+  it("add_wizard_confirm prompt exists", () => {
+    const msg = { from: { language_code: "en" } };
+    const result = t(msg, "add_wizard_confirm", { name: "Test", gender: "L", age: "25", photo: "yes", class: "Salsa" });
+    expect(result).toContain("Test");       // name replaced
+    expect(result).toContain("L");        // gender replaced
+    expect(result).toContain("25");       // age replaced
+    expect(result).toContain("Salsa");   // class replaced
+  });
+
+  it("add_wizard_success message exists", () => {
+    const msg = { from: { language_code: "en" } };
+    const result = t(msg, "add_wizard_success", { id: 123 });
+    expect(result).toContain("123");
+    expect(result).toContain("Enrolled");
+  });
+
+  // Gender buttons for wizard
+  it("gender_btn_L returns Leader button", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "gender_btn_L")).toBe("🕺 Leader");
+  });
+
+  it("gender_btn_F returns Follower button", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "gender_btn_F")).toBe("💃 Follower");
+  });
+
+  it("add_wizard_skip_photo exists", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "add_wizard_skip_photo")).toContain("Skip");
+  });
+
+  it("add_wizard_cancel exists", () => {
+    const msg = { from: { language_code: "en" } };
+    expect(t(msg, "add_wizard_cancel")).toContain("cancelled");
+  });
+});

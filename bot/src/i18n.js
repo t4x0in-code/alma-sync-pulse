@@ -53,6 +53,21 @@ const DEFAULTS = {
   lang_changed: "✓ Language updated!",
   lang_selected: "✓ Language set to {lang}",
 
+  // Sequential /add wizard prompts
+  add_wizard_select_class: "📋 Select a class:",
+  add_wizard_gender: "🧑 Select gender/role:",
+  add_wizard_name: "📝 Enter name:",
+  add_wizard_age: "🎂 Enter age (optional):",
+  add_wizard_photo: "📷 Send photo (optional):",
+  add_wizard_confirm: "✅ Confirm enrollment?\n\n👤 {name}\n🧑 {gender}\n🎂 {age}\n📷 {photo}\n\nClass: {class}",
+  add_wizard_success: "✅ Enrolled! ID: #{id}",
+  add_wizard_cancel: "❌ Enrollment cancelled.",
+  add_wizard_skip_photo: "⏭️ Skip photo",
+
+  // Gender buttons for wizard
+  gender_btn_L: "🕺 Leader",
+  gender_btn_F: "💃 Follower",
+
   // Language keyboard buttons
   lang_btn_en: "🇬🇧 English",
   lang_btn_de: "🇩🇪 Deutsch",
