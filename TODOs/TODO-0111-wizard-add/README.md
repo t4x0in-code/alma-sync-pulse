@@ -1,7 +1,7 @@
 # TODO-0111 — `/add` → fully interactive wizard
 
 **Priority:** P1
-**Status:** open
+**Status:** done — 2026-04-25 · claude-sonnet-4-6
 **Depends on:** TODO-0110
 
 ## Problem

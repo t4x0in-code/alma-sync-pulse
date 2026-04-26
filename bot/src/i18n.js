@@ -11,7 +11,7 @@
 // ============================================================================
 const DEFAULTS = {
   start:
-    "🌹 *AlmaLatina Bot*\nYour chat ID: `{chatId}`\n\nAdd it to ADMIN\\_CHAT\\_IDS to enable commands.\n\n*Commands:*\n/status — overview (L/F, pairs)\n/list <id> — all enrollments\n/add <id> <L|F> <name> [age] — add enrollment\n/del <enrollmentId>\n/match <leaderId> <followerId> — propose pair\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [note]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>\n/lang — change language",
+    "🌹 *AlmaLatina Bot*\nYour chat ID: `{chatId}`\n\nAdd it to ADMIN\\_CHAT\\_IDS to enable commands.\n\n*Commands:*\n/status — class overview\n/list — enrollments\n/add — add student (wizard)\n/lang — change language",
   no_access: "🚫 Access denied.",
   no_courses: "No courses.",
   status_line:
@@ -108,7 +108,7 @@ const DEFAULTS = {
 const OVERRIDES = {
   de: {
     start:
-      "🌹 *AlmaLatina Bot*\nDeine Chat-ID: `{chatId}`\n\nFüge sie zu ADMIN\\_CHAT\\_IDS hinzu, um Befehle zu nutzen.\n\n*Befehle:*\n/status — Übersicht (L/F, Paare)\n/list <id> — alle Anmeldungen\n/add <id> <L|F> <name> [alter] — Anmeldung hinzufügen\n/del <enrollmentId>\n/match <leaderId> <followerId> — Paar vorschlagen\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [notiz]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>",
+      "🌹 *AlmaLatina Bot*\nDeine Chat-ID: `{chatId}`\n\nFüge sie zu ADMIN\\_CHAT\\_IDS hinzu, um Befehle zu nutzen.\n\n*Befehle:*\n/status — Kursübersicht\n/list — Anmeldungen\n/add — Schüler hinzufügen (Wizard)\n/lang — Sprache ändern",
     no_access: "🚫 Kein Zugriff.",
     no_courses: "Keine Kurse.",
     status_line:
@@ -153,7 +153,7 @@ const OVERRIDES = {
 
   ru: {
     start:
-      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\nДобавьте его в ADMIN\\_CHAT\\_IDS для доступа к командам.\n\n*Команды:*\n/status — обзор (L/F, пары)\n/list <id> — все заявки\n/add <id> <L|F> <имя> [возраст] — добавить заявку\n/del <enrollmentId>\n/match <leaderId> <followerId> — предложить пару\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [заметка]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>",
+      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\nДобавьте его в ADMIN\\_CHAT\\_IDS для доступа к командам.\n\n*Команды:*\n/status — обзор курсов\n/list — список заявок\n/add — добавить студента (мастер)\n/lang — изменить язык",
     no_access: "🚫 Нет доступа.",
     no_courses: "Курсы не найдены.",
     status_line:
@@ -198,7 +198,7 @@ const OVERRIDES = {
 
   uk: {
     start:
-      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\nДодайте його до ADMIN\\_CHAT\\_IDS для доступу до команд.\n\n*Команди:*\n/status — огляд (L/F, пари)\n/list <id> — всі заявки\n/add <id> <L|F> <ім'я> [вік] — додати заявку\n/del <enrollmentId>\n/match <leaderId> <followerId> — запропонувати пару\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [примітка]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>",
+      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\nДодайте його до ADMIN\\_CHAT\\_IDS для доступу до команд.\n\n*Команди:*\n/status — огляд курсів\n/list — список заявок\n/add — додати студента (майстер)\n/lang — змінити мову",
     no_access: "🚫 Немає доступу.",
     no_courses: "Курси не знайдено.",
     status_line:
@@ -243,7 +243,7 @@ const OVERRIDES = {
 
   fr: {
     start:
-      "🌹 *AlmaLatina Bot*\nVotre Chat-ID: `{chatId}`\n\nAjoutez-le à ADMIN\\_CHAT\\_IDS pour utiliser les commandes.\n\n*Commandes:*\n/status — vue d'ensemble (L/F, paires)\n/list <id> — toutes les inscriptions\n/add <id> <L|F> <nom> [âge] — ajouter une inscription\n/del <enrollmentId>\n/match <leaderId> <followerId> — proposer une paire\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [note]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>",
+      "🌹 *AlmaLatina Bot*\nVotre Chat-ID: `{chatId}`\n\nAjoutez-le à ADMIN\\_CHAT\\_IDS pour utiliser les commandes.\n\n*Commandes:*\n/status — vue d'ensemble\n/list — inscriptions\n/add — ajouter un étudiant (assistant)\n/lang — changer de langue",
     no_access: "🚫 Accès refusé.",
     no_courses: "Aucun cours.",
     status_line:
@@ -289,7 +289,7 @@ const OVERRIDES = {
 
   tr: {
     start:
-      "🌹 *AlmaLatina Bot*\nChat-ID'niz: `{chatId}`\n\nKomutları kullanmak için ADMIN\\_CHAT\\_IDS'e ekleyin.\n\n*Komutlar:*\n/status — genel bakış (L/F, çiftler)\n/list <id> — tüm kayıtlar\n/add <id> <L|F> <isim> [yaş] — kayıt ekle\n/del <enrollmentId>\n/match <leaderId> <followerId> — çift öner\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [not]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>",
+      "🌹 *AlmaLatina Bot*\nChat-ID'niz: `{chatId}`\n\nKomutları kullanmak için ADMIN\\_CHAT\\_IDS'e ekleyin.\n\n*Komutlar:*\n/status — genel bakış\n/list — kayıtlar\n/add — öğrenci ekle (sihirbaz)\n/lang — dili değiştir",
     no_access: "🚫 Erişim reddedildi.",
     no_courses: "Kurs bulunamadı.",
     status_line:
@@ -334,7 +334,7 @@ const OVERRIDES = {
 
   it: {
     start:
-      "🌹 *AlmaLatina Bot*\nIl tuo Chat-ID: `{chatId}`\n\nAggiungilo ad ADMIN\\_CHAT\\_IDS per usare i comandi.\n\n*Comandi:*\n/status — panoramica (L/F, coppie)\n/list <id> — tutte le iscrizioni\n/add <id> <L|F> <nome> [età] — aggiungi iscrizione\n/del <enrollmentId>\n/match <leaderId> <followerId> — proponi coppia\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [nota]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>",
+      "🌹 *AlmaLatina Bot*\nIl tuo Chat-ID: `{chatId}`\n\nAggiungilo ad ADMIN\\_CHAT\\_IDS per usare i comandi.\n\n*Comandi:*\n/status — panoramica\n/list — iscrizioni\n/add — aggiungi studente (procedura)\n/lang — cambia lingua",
     no_access: "🚫 Accesso negato.",
     no_courses: "Nessun corso.",
     status_line:
@@ -379,7 +379,7 @@ const OVERRIDES = {
 
   es: {
     start:
-      "🌹 *AlmaLatina Bot*\nTu Chat-ID: `{chatId}`\n\nAñádelo a ADMIN\\_CHAT\\_IDS para usar los comandos.\n\n*Comandos:*\n/status — resumen (L/F, parejas)\n/list <id> — todas las inscripciones\n/add <id> <L|F> <nombre> [edad] — añadir inscripción\n/del <enrollmentId>\n/match <leaderId> <followerId> — proponer pareja\n/confirm <pairId>\n/unpair <pairId>\n/reserved <id>\n/add\\_reserved <id> <LL> <FF> [nota]\n/del\\_reserved <reservedId>\n/block <id> · /open <id>\n/add\\_spot <id> · /set\\_capacity <id> <n>",
+      "🌹 *AlmaLatina Bot*\nTu Chat-ID: `{chatId}`\n\nAñádelo a ADMIN\\_CHAT\\_IDS para usar los comandos.\n\n*Comandos:*\n/status — resumen\n/list — inscripciones\n/add — añadir estudiante (asistente)\n/lang — cambiar idioma",
     no_access: "🚫 Acceso denegado.",
     no_courses: "No hay cursos.",
     status_line:

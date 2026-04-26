@@ -271,25 +271,14 @@ if (TELEGRAM_TOKEN) {
   bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
   console.log("✓ Telegram bot started (polling)");
 
-  // Register commands in bot menu
+  // Register only implemented wizard commands in bot menu
+  // (param-based commands are kept registered but not advertised — see TODO-0112..0121)
   bot.setMyCommands([
-    { command: "start", description: "Start bot" },
-    { command: "status", description: "Class overview" },
-    { command: "list", description: "List enrollments" },
-    { command: "lang", description: "Change language" },
-    { command: "add", description: "Add enrollment" },
-    { command: "addwizard", description: "Wizard add (step by step)" },
-    { command: "del", description: "Delete enrollment" },
-    { command: "match", description: "Propose pair" },
-    { command: "confirm", description: "Confirm pair" },
-    { command: "unpair", description: "Remove pair" },
-    { command: "reserved", description: "List reserved" },
-    { command: "add_reserved", description: "Add reserved" },
-    { command: "del_reserved", description: "Delete reserved" },
-    { command: "block", description: "Close class" },
-    { command: "open", description: "Open class" },
-    { command: "add_spot", description: "Add spot" },
-    { command: "set_capacity", description: "Set capacity" },
+    { command: "start",  description: "ℹ️ Intro & chat ID" },
+    { command: "status", description: "📊 Class overview" },
+    { command: "list",   description: "👥 Show enrollments" },
+    { command: "add",    description: "➕ Add student (wizard)" },
+    { command: "lang",   description: "🌍 Change language" },
   ]);
 
   const isAdmin = (msg) => adminChatIds.size === 0 || adminChatIds.has(String(msg.chat.id));
@@ -376,27 +365,19 @@ if (TELEGRAM_TOKEN) {
     });
   });
 
-  bot.onText(/^\/add\s+(\S+)\s+(L|F)\s+(.+?)(?:\s+(\d{1,3}))?$/i, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const [, classId, g, name, age] = m;
-    const c = getClass(classId);
-    if (!c) return bot.sendMessage(msg.chat.id, t(msg, "course_not_found"));
-    const r = db
-      .prepare(
-        "INSERT INTO enrollments (class_id,name,gender,age,source,created_at) VALUES (?,?,?,?,?,?)",
-      )
-      .run(
-        classId,
-        name.trim(),
-        g.toUpperCase(),
-        age ? Number(age) : null,
-        `tg:${msg.chat.id}`,
-        Date.now(),
-      );
-    log(`tg:${msg.chat.id}`, "add_enrollment", { classId, id: r.lastInsertRowid });
-    bot.sendMessage(msg.chat.id, t(msg, "added", { id: r.lastInsertRowid }));
-  });
+  // /add and /addwizard both launch the interactive wizard (TODO-0111)
+  const launchAddWizard = (msg) => {
+    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
+    const chatId = String(msg.chat.id);
+    addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: null, photo: null });
+    const classes = listClassesRaw();
+    bot.sendMessage(msg.chat.id, t(msg, "add_wizard_select_class"), {
+      reply_markup: JSON.stringify({
+        inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `awiz:cls:${c.id}` }]),
+      }),
+    });
+  };
+  bot.onText(/^\/add$/, launchAddWizard);
 
   // Helper: send enrollment list for a class (shared by /list and wizard)
   const sendEnrollmentListTo = (chatId, ctx, classId) => {
@@ -443,18 +424,7 @@ if (TELEGRAM_TOKEN) {
     });
 
   // Sequential /add wizard - start
-  bot.onText(/^\/addwizard$/, (msg) => {
-    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
-    const chatId = String(msg.chat.id);
-    addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: null, photo: null });
-    const classes = listClassesRaw();
-    const kb = {
-      inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `awiz:cls:${c.id}` }]),
-    };
-    bot.sendMessage(msg.chat.id, t(msg, "add_wizard_select_class"), {
-      reply_markup: JSON.stringify(kb),
-    });
-  });
+  bot.onText(/^\/addwizard$/, launchAddWizard); // alias kept for backward compat
 
   // Sequential /add wizard - ALL callback handling in ONE place
   bot.on("callback_query", (q) => {

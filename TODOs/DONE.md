@@ -5,6 +5,26 @@
 
 ---
 
+## 2026-04-25 (session 8 — clean bot menu)
+
+### TODO-0111 — `/add` = wizard, hide unimplemented commands
+**Closed:** 2026-04-25 · claude-sonnet-4-6
+
+**Problem:** `/add` used one-liner syntax with IDs/codes nobody types. Bot menu showed 17 commands, most requiring manual IDs. Signal-to-noise ratio was terrible.
+
+**Solution:**
+- `launchAddWizard()` helper — shared by `/add` and `/addwizard` (alias)
+- `/add` regex changed from param-based `onText` → `/^\/add$/` + wizard launch
+- `bot.setMyCommands()` trimmed to 5 entries: start, status, list, add, lang
+- `start` i18n key updated in DEFAULTS + all 7 locale OVERRIDES to 4-command list
+- Unimplemented param commands still registered (backward compat) but not advertised
+
+**Key pattern learned:** `setMyCommands()` controls Telegram's "/" suggestion menu — separate from what's actually registered. Keep suggestion menu = only what works interactively. Power-user commands stay hidden until wizardified (TODO-0112..0121).
+
+**Files:** `bot/src/server.js`, `bot/src/i18n.js`
+
+---
+
 ## 2026-04-25 (session 7 — emoji avatar picker)
 
 ### TODO-0009 — Wizard emoji avatar picker
