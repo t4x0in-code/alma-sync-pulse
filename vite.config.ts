@@ -10,6 +10,10 @@ export default defineConfig({
   vite: {
     server: {
       allowedHosts: ["al.taxoin.eu"],
+      proxy: {
+        "/api":    { target: "http://localhost:8081", changeOrigin: true },
+        "/health": { target: "http://localhost:8081", changeOrigin: true },
+      },
     },
   },
 });
