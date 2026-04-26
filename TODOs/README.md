@@ -17,6 +17,7 @@
 - [TODO-0001](./TODO-0001-fix-failed-to-fetch-cors/) — Корректный CORS и обработка сетевых ошибок бота
 - [TODO-0002](./TODO-0002-admin-token-secure-storage/) — Безопасное хранение ADMIN_TOKEN на клиенте
 - [TODO-0003](./TODO-0003-photo-size-validation/) — Жёсткая валидация размера и MIME загружаемых фото
+- [TODO-0007](./TODO-0007-fix-and-test-addwizard-flow/) — Исправление и тестирование сломанного флоу /addwizard
 
 ### P1 — Обязательные
 

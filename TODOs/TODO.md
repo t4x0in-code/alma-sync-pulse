@@ -19,6 +19,18 @@
 - [ ] [TODO-0104](./TODO-0104-multi-course-support/) — Multi-course & schedule support
 - [ ] [TODO-0106](./TODO-0106-telegram-webhook-mode/) — Switch bot from polling to webhook
 - [ ] [TODO-0107](./TODO-0107-class-crud/) — Class CRUD bot commands (add_class, del_class, list_classes)
+- [ ] [TODO-0110](./TODO-0110-shared-wizard-infra/) — Shared wizard infrastructure (wizardKit.js) — **implement first**
+- [ ] [TODO-0111](./TODO-0111-wizard-add/) — `/add` → alias to `/addwizard`, retire one-liner syntax
+- [ ] [TODO-0112](./TODO-0112-wizard-del/) — `/del` → interactive enrollment picker wizard
+- [ ] [TODO-0113](./TODO-0113-wizard-match/) — `/match` → interactive class → leader → follower wizard
+- [ ] [TODO-0114](./TODO-0114-wizard-confirm/) — `/confirm` → interactive proposed-pair picker wizard
+- [ ] [TODO-0115](./TODO-0115-wizard-unpair/) — `/unpair` → interactive pair-delete wizard
+- [ ] [TODO-0116](./TODO-0116-wizard-reserved/) — `/reserved` → auto class picker (read-only)
+- [ ] [TODO-0117](./TODO-0117-wizard-add-reserved/) — `/add_reserved` → interactive Stammplatz wizard
+- [ ] [TODO-0118](./TODO-0118-wizard-del-reserved/) — `/del_reserved` → interactive reserved-pair picker wizard
+- [ ] [TODO-0119](./TODO-0119-wizard-block-open/) — `/block` + `/open` → interactive class status wizard
+- [ ] [TODO-0120](./TODO-0120-wizard-add-spot/) — `/add_spot` → interactive +1 capacity wizard
+- [ ] [TODO-0121](./TODO-0121-wizard-set-capacity/) — `/set_capacity` → class picker + number input wizard
 
 ## P2 — UX / quality
 
