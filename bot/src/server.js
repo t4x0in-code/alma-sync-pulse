@@ -356,30 +356,16 @@ if (TELEGRAM_TOKEN) {
 
   bot.onText(/^\/list(?:\s+(\S+))?$/, (msg, m) => {
     if (!guard(msg)) return;
-    const l = msg;
     const classIdArg = m[1];
     const classes = listClassesRaw();
 
-    const sendEnrollmentList = (c) => {
-      const en = listEnrollments(c.id);
-      if (!en.length) return bot.sendMessage(msg.chat.id, t(msg, "no_enrollments"));
-      const txt = en
-        .map(
-          (r) =>
-            `#${r.id} ${r.gender === "L" ? "🕺" : "💃"} *${r.name}*${r.age ? `, ${r.age}` : ""}${r.comment ? `\n   _${r.comment}_` : ""}`,
-        )
-        .join("\n");
-      bot.sendMessage(msg.chat.id, `*${c.title}*\n${txt}`, { parse_mode: "Markdown" });
-    };
-
     if (classIdArg) {
-      const c = getClass(classIdArg);
-      if (!c) return bot.sendMessage(msg.chat.id, t(msg, "course_not_found"));
-      return sendEnrollmentList(c);
+      if (!getClass(classIdArg)) return bot.sendMessage(msg.chat.id, t(msg, "course_not_found"));
+      return sendEnrollmentListTo(msg.chat.id, msg, classIdArg);
     }
 
     if (classes.length === 1) {
-      return sendEnrollmentList(classes[0]);
+      return sendEnrollmentListTo(msg.chat.id, msg, classes[0].id);
     }
 
     const kb = {
@@ -411,6 +397,18 @@ if (TELEGRAM_TOKEN) {
     log(`tg:${msg.chat.id}`, "add_enrollment", { classId, id: r.lastInsertRowid });
     bot.sendMessage(msg.chat.id, t(msg, "added", { id: r.lastInsertRowid }));
   });
+
+  // Helper: send enrollment list for a class (shared by /list and wizard)
+  const sendEnrollmentListTo = (chatId, ctx, classId) => {
+    const c = getClass(classId);
+    if (!c) return;
+    const en = listEnrollments(c.id);
+    if (!en.length) return bot.sendMessage(chatId, t(ctx, "no_enrollments"));
+    const txt = en
+      .map((r) => `#${r.id} ${r.gender === "L" ? "🕺" : "💃"} *${r.name}*${r.age ? `, ${r.age}` : ""}${r.comment ? `\n   _${r.comment}_` : ""}`)
+      .join("\n");
+    bot.sendMessage(chatId, `*${c.title}*\n${txt}`, { parse_mode: "Markdown" });
+  };
 
   // Helper: send wizard confirm message with OK/Cancel keyboard
   const sendWizardConfirm = (chatId, ctx, state) => {
@@ -490,7 +488,8 @@ if (TELEGRAM_TOKEN) {
     // Wizard: skip age
     if (ns === "awiz" && action === "age") {
       const state = addWizardState.get(chatId);
-      if (!state || state.step !== "age") return bot.answerCallbackQuery(q.id);
+      if (!state || state.step !== "age")
+        return bot.answerCallbackQuery(q.id, { text: t(q, "wizard_expired") });
       state.age = null;
       state.step = "confirm";
       addWizardState.set(chatId, state);
@@ -501,7 +500,8 @@ if (TELEGRAM_TOKEN) {
     // Wizard: confirm or cancel enrollment
     if (ns === "awiz" && action === "confirm") {
       const state = addWizardState.get(chatId);
-      if (!state || state.step !== "confirm") return bot.answerCallbackQuery(q.id);
+      if (!state || state.step !== "confirm")
+        return bot.answerCallbackQuery(q.id, { text: t(q, "wizard_expired") });
       if (val === "no") {
         addWizardState.delete(chatId);
         bot.answerCallbackQuery(q.id);
@@ -521,6 +521,7 @@ if (TELEGRAM_TOKEN) {
           chat_id: q.message.chat.id,
           message_id: q.message.message_id,
         });
+        sendEnrollmentListTo(q.message.chat.id, q, state.classId);
         const c = getClass(state.classId);
         notifyAdmins((al) => t({ from: { language_code: al } }, "notify_enroll", {
           role: state.gender === "L" ? "🕺 Leader" : "💃 Follower",

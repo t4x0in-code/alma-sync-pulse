@@ -66,6 +66,7 @@ const DEFAULTS = {
   add_wizard_yes: "✅ Confirm",
   add_wizard_no: "❌ Cancel",
   add_wizard_skip: "⏭️ Skip",
+  wizard_expired: "⚠️ Session expired. Use /addwizard to start over.",
 
   // Gender buttons for wizard
   gender_btn_L: "🕺 Leader",

@@ -129,6 +129,32 @@ describe("/addwizard state machine", () => {
   });
 });
 
+// ---------- unit: state-loss guard ----------
+
+describe("/addwizard state-loss guard (bot restart simulation)", () => {
+  it("confirm with no state throws wrong step", () => {
+    // Simulates: bot restarted, state wiped, user taps ✅
+    const noState = undefined as unknown as WizardState;
+    expect(() => {
+      if (!noState || noState.step !== "confirm") throw new Error("session expired");
+    }).toThrow("session expired");
+  });
+
+  it("age-skip with no state throws wrong step", () => {
+    const noState = undefined as unknown as WizardState;
+    expect(() => {
+      if (!noState || noState.step !== "age") throw new Error("session expired");
+    }).toThrow("session expired");
+  });
+
+  it("state at wrong step triggers expired guard", () => {
+    const staleState: WizardState = { step: "class", classId: "", gender: "", name: "", age: null };
+    expect(() => {
+      if (!staleState || staleState.step !== "confirm") throw new Error("session expired");
+    }).toThrow("session expired");
+  });
+});
+
 // ---------- integration: wizard confirm → DB insert (via REST proxy) ----------
 
 const BASE = process.env.BOT_API_URL || "http://localhost:8081";

@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-04-25 (session 6 — wizard feedback + state guard)
+
+### TODO-0008 — Wizard: silent state-loss + missing post-enroll list
+**Closed:** 2026-04-25 · claude-sonnet-4-6
+
+**Problem:** Two bugs found during live testing:
+1. Bot restart wipes in-memory `addWizardState`. User tapping ✅ after restart got silent `answerCallbackQuery` with no toast — nothing happened, DB untouched.
+2. Successful enrollment had no feedback beyond the edited success line. Admin had to manually `/list` to see updated roster.
+
+**Solution:**
+1. State-loss guard: `if (!state || state.step !== "confirm") return bot.answerCallbackQuery(q.id, { text: t(q, "wizard_expired") })` — same for `awiz:age:skip`. Added `wizard_expired` i18n key to DEFAULTS.
+2. Post-enroll list: extracted `sendEnrollmentListTo(chatId, ctx, classId)` shared helper from `/list` handler. Called immediately after wizard success edit. `/list` command now uses the same helper (DRY).
+
+**Key patterns learned:**
+- In-memory state + inline keyboard buttons = landmine. Buttons survive bot restarts; state doesn't. Every callback that reads state must give explicit user feedback on miss — never silent return.
+- `answerCallbackQuery(q.id, { text: "..." })` shows a toast popup to the user — the only feedback channel when the message is already sent.
+- Extract rendering helpers (`sendEnrollmentListTo`) at block-scope (inside `if (TELEGRAM_TOKEN)`) so they close over `bot` but are accessible to multiple handlers.
+
+**Files:** `bot/src/server.js`, `bot/src/i18n.js`, `tests/unit/wizard.test.ts`
+
+---
+
 ## 2026-04-25 (session 5 — wizard fix)
 
 ### TODO-0007 — /addwizard: missing `bot.on("message")` text handler
