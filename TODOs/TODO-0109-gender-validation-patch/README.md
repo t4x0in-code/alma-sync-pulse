@@ -1,7 +1,7 @@
 # TODO-0109 — Gender not validated on `PATCH /api/admin/enrollments/:id`
 
 **Priority:** P1
-**Status:** open
+**Status:** done — 2026-04-25 · claude-sonnet-4-6 · commit 8f49556
 
 ## Problem
 

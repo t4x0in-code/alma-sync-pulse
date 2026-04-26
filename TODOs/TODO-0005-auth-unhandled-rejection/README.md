@@ -1,7 +1,7 @@
 # TODO-0005 — Unhandled promise rejection in `POST /api/auth/request`
 
 **Priority:** P0
-**Status:** open
+**Status:** done — 2026-04-25 · claude-sonnet-4-6 · commit 8f49556
 
 ## Problem
 

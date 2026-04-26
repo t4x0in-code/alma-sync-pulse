@@ -1,7 +1,7 @@
 # TODO-0004 — Auth Telegram button labels hard-coded German
 
 **Priority:** P0
-**Status:** open
+**Status:** done — 2026-04-25 · claude-sonnet-4-6 · commit 8f49556
 
 ## Problem
 

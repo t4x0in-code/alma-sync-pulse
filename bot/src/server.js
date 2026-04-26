@@ -412,38 +412,58 @@ if (TELEGRAM_TOKEN) {
     bot.sendMessage(msg.chat.id, t(msg, "added", { id: r.lastInsertRowid }));
   });
 
+  // Helper: send wizard confirm message with OK/Cancel keyboard
+  const sendWizardConfirm = (chatId, ctx, state) => {
+    const c = getClass(state.classId);
+    const text = t(ctx, "add_wizard_confirm", {
+      name: state.name,
+      gender: t(ctx, state.gender === "L" ? "role_L" : "role_F"),
+      age: state.age ?? "—",
+      photo: "—",
+      class: c?.title ?? state.classId,
+    });
+    return bot.sendMessage(chatId, text, {
+      reply_markup: JSON.stringify({ inline_keyboard: [[
+        { text: t(ctx, "add_wizard_yes"), callback_data: "awiz:confirm:yes" },
+        { text: t(ctx, "add_wizard_no"),  callback_data: "awiz:confirm:no" },
+      ]] }),
+    });
+  };
+
   // Sequential /add wizard - start
   bot.onText(/^\/addwizard$/, (msg) => {
-    console.log("DEBUG: /addwizard called from", msg.chat.id);
     if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
     const chatId = String(msg.chat.id);
-    addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: "", photo: "" });
+    addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: "" });
     const classes = listClassesRaw();
-    console.log("DEBUG: classes found:", classes.length, classes.map(c => c.id));
     const kb = {
-      inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `addw_class:${c.id}` }]),
+      inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `awiz:cls:${c.id}` }]),
     };
-    console.log("DEBUG: sending keyboard with", classes.length, "classes");
     bot.sendMessage(msg.chat.id, t(msg, "add_wizard_select_class"), {
       reply_markup: JSON.stringify(kb),
     });
   });
 
-  // Sequential /add wizard - callback for class selection
+  // Sequential /add wizard - ALL callback handling in ONE place
   bot.on("callback_query", (q) => {
-    const [ns, action, value] = (q.data ?? "").split(":");
-    if (ns === "addw_class") {
-      const chatId = String(q.message.chat.id);
+    const parts = (q.data ?? "").split(":");
+    const ns = parts[0];
+    const action = parts[1];
+    const val = parts[2];
+    const chatId = String(q.message?.chat?.id);
+
+    // Wizard: class selected
+    if (ns === "awiz" && action === "cls") {
       const state = addWizardState.get(chatId);
       if (!state || state.step !== "class") return bot.answerCallbackQuery(q.id);
-      state.classId = value;
+      state.classId = val;
       state.step = "gender";
       addWizardState.set(chatId, state);
       bot.answerCallbackQuery(q.id);
       const kb = {
         inline_keyboard: [
-          [{ text: t(q, "gender_btn_L"), callback_data: "addw_gender:L" }],
-          [{ text: t(q, "gender_btn_F"), callback_data: "addw_gender:F" }],
+          [{ text: "🕺 Leader", callback_data: `awiz:gender:L` }],
+          [{ text: "💃 Follower", callback_data: `awiz:gender:F` }],
         ],
       };
       return bot.editMessageText(t(q, "add_wizard_gender"), {
@@ -452,11 +472,12 @@ if (TELEGRAM_TOKEN) {
         reply_markup: JSON.stringify(kb),
       });
     }
-    if (ns === "addw_gender") {
-      const chatId = String(q.message.chat.id);
+
+    // Wizard: gender selected -> save to DB immediately!
+    if (ns === "awiz" && action === "gender") {
       const state = addWizardState.get(chatId);
       if (!state || state.step !== "gender") return bot.answerCallbackQuery(q.id);
-      state.gender = value;
+      state.gender = val;
       state.step = "name";
       addWizardState.set(chatId, state);
       bot.answerCallbackQuery(q.id);
@@ -465,187 +486,58 @@ if (TELEGRAM_TOKEN) {
         message_id: q.message.message_id,
       });
     }
-  });
 
-  // Sequential /add wizard - handle name, age inputs (text messages)
-  bot.on("message", (msg) => {
-    const chatId = String(msg.chat.id);
-    const state = addWizardState.get(chatId);
-    if (!state || !msg.text || msg.text.startsWith("/")) return;
-    if (state.step === "name") {
-      state.name = msg.text;
-      state.step = "age";
+    // Wizard: skip age
+    if (ns === "awiz" && action === "age") {
+      const state = addWizardState.get(chatId);
+      if (!state || state.step !== "age") return bot.answerCallbackQuery(q.id);
+      state.age = null;
+      state.step = "confirm";
       addWizardState.set(chatId, state);
-      return bot.sendMessage(msg.chat.id, t(msg, "add_wizard_age"));
+      bot.answerCallbackQuery(q.id);
+      return sendWizardConfirm(q.message.chat.id, q, state);
     }
-    if (state.step === "age") {
-      const ageNum = parseInt(msg.text, 10);
-      state.age = ageNum > 0 && ageNum < 100 ? String(ageNum) : "";
-      state.step = "photo";
-      addWizardState.set(chatId, state);
-      const kb = {
-        inline_keyboard: [
-          [{ text: t(msg, "add_wizard_skip_photo"), callback_data: "addw_photo:skip" }],
-        ],
-      };
-      return bot.sendMessage(msg.chat.id, t(msg, "add_wizard_photo"), {
-        reply_markup: JSON.stringify(kb),
-      });
-    }
-  });
 
-  bot.onText(/^\/del\s+(\d+)/, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const id = Number(m[1]);
-    db.prepare("DELETE FROM pairs WHERE leader_id=? OR follower_id=?").run(id, id);
-    const r = db.prepare("DELETE FROM enrollments WHERE id=?").run(id);
-    log(`tg:${msg.chat.id}`, "del_enrollment", { id });
-    bot.sendMessage(msg.chat.id, r.changes ? t(msg, "deleted", { id }) : t(msg, "not_found"));
-  });
-
-  bot.onText(/^\/match\s+(\d+)\s+(\d+)/, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const a = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[1]));
-    const b = db.prepare("SELECT * FROM enrollments WHERE id=?").get(Number(m[2]));
-    if (!a || !b) return bot.sendMessage(msg.chat.id, t(msg, "enrollment_not_found"));
-    if (a.class_id !== b.class_id) return bot.sendMessage(msg.chat.id, t(msg, "different_courses"));
-    const leader = a.gender === "L" ? a : b.gender === "L" ? b : null;
-    const follower = a.gender === "F" ? a : b.gender === "F" ? b : null;
-    if (!leader || !follower) return bot.sendMessage(msg.chat.id, t(msg, "need_l_f"));
-    try {
-      const r = db
-        .prepare(
-          "INSERT INTO pairs (class_id,leader_id,follower_id,status,created_at) VALUES (?,?,?,?,?)",
-        )
-        .run(a.class_id, leader.id, follower.id, "proposed", Date.now());
-      log(`tg:${msg.chat.id}`, "match", { id: r.lastInsertRowid });
-      bot.sendMessage(
-        msg.chat.id,
-        t(msg, "pair_proposed", {
+    // Wizard: confirm or cancel enrollment
+    if (ns === "awiz" && action === "confirm") {
+      const state = addWizardState.get(chatId);
+      if (!state || state.step !== "confirm") return bot.answerCallbackQuery(q.id);
+      if (val === "no") {
+        addWizardState.delete(chatId);
+        bot.answerCallbackQuery(q.id);
+        return bot.editMessageText(t(q, "add_wizard_cancel"), {
+          chat_id: q.message.chat.id,
+          message_id: q.message.message_id,
+        });
+      }
+      try {
+        const r = db
+          .prepare("INSERT INTO enrollments (class_id,name,gender,age,source,created_at) VALUES (?,?,?,?,?,?)")
+          .run(state.classId, state.name.trim(), state.gender, state.age ?? null, `tg:${chatId}`, Date.now());
+        log(`tg:${chatId}`, "add_enrollment_wizard", { id: r.lastInsertRowid });
+        addWizardState.delete(chatId);
+        bot.answerCallbackQuery(q.id);
+        bot.editMessageText(t(q, "add_wizard_success", { id: r.lastInsertRowid }), {
+          chat_id: q.message.chat.id,
+          message_id: q.message.message_id,
+        });
+        const c = getClass(state.classId);
+        notifyAdmins((al) => t({ from: { language_code: al } }, "notify_enroll", {
+          role: state.gender === "L" ? "🕺 Leader" : "💃 Follower",
+          name: state.name,
+          age: state.age ? `, ${state.age}` : "",
+          comment: "",
+          title: c?.title ?? state.classId,
           id: r.lastInsertRowid,
-          leader: leader.name,
-          follower: follower.name,
-        }),
-      );
-    } catch (e) {
-      console.error("match error:", e.message);
-      bot.sendMessage(msg.chat.id, t(msg, "db_error"));
+        }));
+      } catch (e) {
+        console.error("wizard confirm error:", e.message);
+        bot.answerCallbackQuery(q.id, { text: t(q, "db_error") });
+      }
+      return;
     }
-  });
 
-  bot.onText(/^\/confirm\s+(\d+)/, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const r = db.prepare("UPDATE pairs SET status='confirmed' WHERE id=?").run(Number(m[1]));
-    log(`tg:${msg.chat.id}`, "confirm_pair", { id: Number(m[1]) });
-    bot.sendMessage(
-      msg.chat.id,
-      r.changes ? t(msg, "pair_confirmed", { id: m[1] }) : t(msg, "pair_not_found"),
-    );
-  });
-
-  bot.onText(/^\/unpair\s+(\d+)/, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const r = db.prepare("DELETE FROM pairs WHERE id=?").run(Number(m[1]));
-    log(`tg:${msg.chat.id}`, "unpair", { id: Number(m[1]) });
-    bot.sendMessage(
-      msg.chat.id,
-      r.changes ? t(msg, "pair_deleted", { id: m[1] }) : t(msg, "pair_not_found"),
-    );
-  });
-
-  bot.onText(/^\/reserved\s+(\S+)/, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const rows = listReserved(m[1]);
-    if (!rows.length) return bot.sendMessage(msg.chat.id, t(msg, "no_reserved"));
-    bot.sendMessage(
-      msg.chat.id,
-      rows
-        .map(
-          (r) => `#${r.id} 🔒 ${r.leader_nick}–${r.follower_nick}${r.note ? ` · ${r.note}` : ""}`,
-        )
-        .join("\n"),
-    );
-  });
-
-  bot.onText(/^\/add_reserved\s+(\S+)\s+([A-Za-z]{2})\s+([A-Za-z]{2})(?:\s+(.+))?$/, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const [, classId, lNick, f, note] = m;
-    try {
-      const r = db
-        .prepare(
-          "INSERT INTO reserved_pairs (class_id,leader_nick,follower_nick,note) VALUES (?,?,?,?)",
-        )
-        .run(classId, lNick.toUpperCase(), f.toUpperCase(), note || null);
-      log(`tg:${msg.chat.id}`, "add_reserved", { id: r.lastInsertRowid });
-      bot.sendMessage(
-        msg.chat.id,
-        t(msg, "reserved_added", {
-          id: r.lastInsertRowid,
-          l: lNick.toUpperCase(),
-          f: f.toUpperCase(),
-        }),
-      );
-    } catch (e) {
-      console.error("add_reserved error:", e.message);
-      bot.sendMessage(msg.chat.id, t(msg, "db_error"));
-    }
-  });
-
-  bot.onText(/^\/del_reserved\s+(\d+)/, (msg, m) => {
-    if (!guard(msg)) return;
-    const l = lang(msg.from);
-    const r = db.prepare("DELETE FROM reserved_pairs WHERE id=?").run(Number(m[1]));
-    log(`tg:${msg.chat.id}`, "del_reserved", { id: Number(m[1]) });
-    bot.sendMessage(
-      msg.chat.id,
-      r.changes ? t(msg, "reserved_deleted", { id: m[1] }) : t(msg, "not_found"),
-    );
-  });
-
-  // Class admin
-  const cmdWithId = (re, fn) =>
-    bot.onText(re, (msg, m) => {
-      if (!guard(msg)) return;
-      const c = getClass(m[1]);
-      if (!c)
-        return bot.sendMessage(msg.chat.id, t(msg, "course_not_found_id", { id: m[1] }));
-      fn(msg, c, m);
-    });
-
-  cmdWithId(/^\/block\s+(\S+)/, (msg, c) => {
-    db.prepare("UPDATE classes SET status='closed' WHERE id=?").run(c.id);
-    log(`tg:${msg.chat.id}`, "block", { id: c.id });
-    bot.sendMessage(msg.chat.id, t(msg, "course_closed", { title: c.title }));
-  });
-  cmdWithId(/^\/open\s+(\S+)/, (msg, c) => {
-    db.prepare("UPDATE classes SET status='open' WHERE id=?").run(c.id);
-    log(`tg:${msg.chat.id}`, "open", { id: c.id });
-    bot.sendMessage(msg.chat.id, t(msg, "course_opened", { title: c.title }));
-  });
-  cmdWithId(/^\/add_spot\s+(\S+)/, (msg, c) => {
-    db.prepare("UPDATE classes SET max_capacity=max_capacity+1 WHERE id=?").run(c.id);
-    log(`tg:${msg.chat.id}`, "add_spot", { id: c.id });
-    bot.sendMessage(
-      msg.chat.id,
-      t(msg, "spot_added", { title: c.title, n: c.max_capacity + 1 }),
-    );
-  });
-  cmdWithId(/^\/set_capacity\s+(\S+)\s+(\d+)/, (msg, c, m) => {
-    const n = parseInt(m[2], 10);
-    db.prepare("UPDATE classes SET max_capacity=? WHERE id=?").run(n, c.id);
-    log(`tg:${msg.chat.id}`, "set_capacity", { id: c.id, n });
-    bot.sendMessage(msg.chat.id, t(msg, "capacity_set", { title: c.title, n }));
-  });
-
-  bot.on("callback_query", (q) => {
-    const [ns, action, requestId] = (q.data ?? "").split(":");
-
+    // Existing handlers below
     if (ns === "list_class") {
       const c = getClass(action);
       if (!c) return bot.answerCallbackQuery(q.id, { text: t(q, "course_not_found") });
@@ -675,9 +567,9 @@ if (TELEGRAM_TOKEN) {
     }
 
     if (ns !== "auth") return bot.answerCallbackQuery(q.id);
-    const entry = pendingAuth.get(requestId);
+    const entry = pendingAuth.get(val);
     if (!entry || entry.expires < Date.now()) {
-      pendingAuth.delete(requestId);
+      pendingAuth.delete(val);
       bot.answerCallbackQuery(q.id, { text: t(q, "auth_expired_cb") });
       return bot.editMessageText(t(q, "auth_expired_msg"), {
         chat_id: q.message.chat.id,
@@ -701,6 +593,41 @@ if (TELEGRAM_TOKEN) {
       });
     }
   });
+  // Wizard text input handler (name and age steps)
+  bot.on("message", (msg) => {
+    if (!isAdmin(msg)) return;
+    const chatId = String(msg.chat.id);
+    const state = addWizardState.get(chatId);
+    if (!state) return;
+    const text = msg.text?.trim();
+    if (!text || text.startsWith("/")) return; // ignore commands mid-wizard
+
+    if (state.step === "name") {
+      if (text.length < 2 || text.length > 80) {
+        return bot.sendMessage(msg.chat.id, t(msg, "add_wizard_name") + " (2–80 chars)");
+      }
+      state.name = text;
+      state.step = "age";
+      addWizardState.set(chatId, state);
+      return bot.sendMessage(msg.chat.id, t(msg, "add_wizard_age"), {
+        reply_markup: JSON.stringify({ inline_keyboard: [[
+          { text: t(msg, "add_wizard_skip"), callback_data: "awiz:age:skip" },
+        ]] }),
+      });
+    }
+
+    if (state.step === "age") {
+      const age = parseInt(text, 10);
+      if (isNaN(age) || age < 10 || age > 99) {
+        return bot.sendMessage(msg.chat.id, "❌ Age must be 10–99, or tap Skip.");
+      }
+      state.age = age;
+      state.step = "confirm";
+      addWizardState.set(chatId, state);
+      return sendWizardConfirm(msg.chat.id, msg, state);
+    }
+  });
+
 } else {
   console.warn("⚠ TELEGRAM_TOKEN not set — bot disabled, REST API only");
 }

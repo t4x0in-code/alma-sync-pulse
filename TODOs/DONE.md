@@ -5,6 +5,42 @@
 
 ---
 
+## 2026-04-25 (session 5 — wizard fix)
+
+### TODO-0007 — /addwizard: missing `bot.on("message")` text handler
+**Closed:** 2026-04-25 · claude-sonnet-4-6
+
+**Problem:** Wizard flow stuck at `step: "name"` — no `bot.on("message")` handler existed to capture typed input. Also: `callback_query` auth block referenced `requestId` (out of scope) instead of `val = parts[2]`.
+
+**Solution (KISS):**
+1. Added `sendWizardConfirm()` helper — builds confirm text + OK/Cancel keyboard
+2. Added `awiz:age:skip` callback case — skips age, advances to confirm
+3. Added `awiz:confirm:yes/no` callback case — inserts to DB or cancels
+4. Added `bot.on("message")` handler — processes `step:"name"` and `step:"age"` text input, guards against commands mid-wizard (`text.startsWith("/")`), validates length/range
+5. Fixed `requestId` → `val` in auth block (one-character shadow bug)
+6. Added 3 i18n keys to DEFAULTS: `add_wizard_yes`, `add_wizard_no`, `add_wizard_skip`
+
+**Complete wizard flow:**
+```
+/addwizard → [class KB] → awiz:cls:<id> → [gender KB]
+→ awiz:gender:<L|F> → "Enter name:" (edited msg)
+→ bot.on("message") name → "Enter age: [Skip]" (new msg)
+→ bot.on("message") age  OR  awiz:age:skip → [Confirm/Cancel KB]
+→ awiz:confirm:yes → INSERT → success | awiz:confirm:no → cancel
+```
+
+**Tests:** `tests/unit/wizard.test.ts` — 14 unit tests (state machine: transitions, validation, happy paths, wrong-order guards) + 4 integration tests (skipped by default, REST proxy).
+
+**Key patterns learned:**
+- `bot.on("message")` fires on ALL messages including commands — always guard with `if (text?.startsWith("/")) return`
+- Shadow variable bug: merged callback handlers share `parts[]` — use named vars (`val = parts[2]`) consistently, never reference outer-scope vars by accident
+- Wizard state machine is pure logic → test it without Telegram mocks
+- REST endpoint is the integration proxy for wizard's DB step — no need to mock `bot.on`
+
+**Files:** `bot/src/server.js`, `bot/src/i18n.js`, `tests/unit/wizard.test.ts`
+
+---
+
 ## 2026-04-25 (session 4 — TDD test suite)
 
 ### TODO-0308 — Bot function test suite
