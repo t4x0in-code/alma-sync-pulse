@@ -8,11 +8,12 @@ import { describe, it, expect } from "vitest";
 // ---------- unit: wizard state machine ----------
 
 interface WizardState {
-  step: "class" | "gender" | "name" | "age" | "confirm";
+  step: "class" | "gender" | "name" | "age" | "avatar" | "confirm";
   classId: string;
   gender: string;
   name: string;
   age: number | null;
+  photo: string | null;
 }
 
 function wizardTransitionClass(state: WizardState, classId: string): WizardState {
@@ -36,11 +37,16 @@ function wizardTransitionName(state: WizardState, name: string): WizardState {
 function wizardTransitionAge(state: WizardState, age: number | null): WizardState {
   if (state.step !== "age") throw new Error("wrong step");
   if (age !== null && (age < 10 || age > 99)) throw new Error("age 10–99");
-  return { ...state, age, step: "confirm" };
+  return { ...state, age, step: "avatar" };
+}
+
+function wizardTransitionAvatar(state: WizardState, emoji: string | null): WizardState {
+  if (state.step !== "avatar") throw new Error("wrong step");
+  return { ...state, photo: emoji ? `emoji:${emoji}` : null, step: "confirm" };
 }
 
 describe("/addwizard state machine", () => {
-  const initial: WizardState = { step: "class", classId: "", gender: "", name: "", age: null };
+  const initial: WizardState = { step: "class", classId: "", gender: "", name: "", age: null, photo: null };
 
   it("class step advances to gender", () => {
     const s = wizardTransitionClass(initial, "thu-2000-cubana");
@@ -77,16 +83,16 @@ describe("/addwizard state machine", () => {
     expect(() => wizardTransitionName({ ...initial, step: "name" }, "x".repeat(81))).toThrow("2–80");
   });
 
-  it("age step advances to confirm", () => {
+  it("age step advances to avatar", () => {
     const s = wizardTransitionAge({ ...initial, step: "age" }, 25);
-    expect(s.step).toBe("confirm");
+    expect(s.step).toBe("avatar");
     expect(s.age).toBe(25);
   });
 
-  it("age skip (null) is valid", () => {
+  it("age skip (null) advances to avatar", () => {
     const s = wizardTransitionAge({ ...initial, step: "age" }, null);
     expect(s.age).toBeNull();
-    expect(s.step).toBe("confirm");
+    expect(s.step).toBe("avatar");
   });
 
   it("age below 10 throws", () => {
@@ -97,29 +103,49 @@ describe("/addwizard state machine", () => {
     expect(() => wizardTransitionAge({ ...initial, step: "age" }, 100)).toThrow("age 10–99");
   });
 
-  it("full happy path: class → gender → name → age → confirm", () => {
+  it("avatar step: emoji stored with prefix", () => {
+    const s = wizardTransitionAvatar({ ...initial, step: "avatar" }, "🧑");
+    expect(s.step).toBe("confirm");
+    expect(s.photo).toBe("emoji:🧑");
+  });
+
+  it("avatar step: skip stores null", () => {
+    const s = wizardTransitionAvatar({ ...initial, step: "avatar" }, null);
+    expect(s.step).toBe("confirm");
+    expect(s.photo).toBeNull();
+  });
+
+  it("avatar step: wrong step throws", () => {
+    expect(() => wizardTransitionAvatar(initial, "🧑")).toThrow("wrong step");
+  });
+
+  it("full happy path: class → gender → name → age → avatar → confirm", () => {
     let s = initial;
     s = wizardTransitionClass(s, "thu-2000-cubana");
     s = wizardTransitionGender(s, "F");
     s = wizardTransitionName(s, "Maria Lopez");
     s = wizardTransitionAge(s, 28);
+    s = wizardTransitionAvatar(s, "👩");
     expect(s).toMatchObject({
       step: "confirm",
       classId: "thu-2000-cubana",
       gender: "F",
       name: "Maria Lopez",
       age: 28,
+      photo: "emoji:👩",
     });
   });
 
-  it("full happy path with age skip", () => {
+  it("full happy path with age + avatar both skipped", () => {
     let s = initial;
     s = wizardTransitionClass(s, "thu-2000-cubana");
     s = wizardTransitionGender(s, "L");
     s = wizardTransitionName(s, "Carlos Ruiz");
     s = wizardTransitionAge(s, null);
+    s = wizardTransitionAvatar(s, null);
     expect(s.step).toBe("confirm");
     expect(s.age).toBeNull();
+    expect(s.photo).toBeNull();
   });
 
   it("wrong step order throws", () => {

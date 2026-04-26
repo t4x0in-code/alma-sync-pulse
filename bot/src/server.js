@@ -417,7 +417,7 @@ if (TELEGRAM_TOKEN) {
       name: state.name,
       gender: t(ctx, state.gender === "L" ? "role_L" : "role_F"),
       age: state.age ?? "—",
-      photo: "—",
+      photo: state.photo ? state.photo.replace("emoji:", "") : "—",
       class: c?.title ?? state.classId,
     });
     return bot.sendMessage(chatId, text, {
@@ -428,11 +428,25 @@ if (TELEGRAM_TOKEN) {
     });
   };
 
+  // Emoji avatar set — 12 faces in 2 rows
+  const WIZARD_AVATARS = [
+    ["🧑","👩","👨","👱","👱‍♀️","🧔"],
+    ["👩‍🦱","👩‍🦰","👩‍🦳","👨‍🦱","👨‍🦰","👨‍🦳"],
+  ];
+
+  const sendAvatarPicker = (chatId, ctx) =>
+    bot.sendMessage(chatId, t(ctx, "add_wizard_avatar"), {
+      reply_markup: JSON.stringify({ inline_keyboard: [
+        ...WIZARD_AVATARS.map((row) => row.map((e) => ({ text: e, callback_data: `awiz:avatar:${e}` }))),
+        [{ text: t(ctx, "add_wizard_skip"), callback_data: "awiz:avatar:skip" }],
+      ]}),
+    });
+
   // Sequential /add wizard - start
   bot.onText(/^\/addwizard$/, (msg) => {
     if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
     const chatId = String(msg.chat.id);
-    addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: "" });
+    addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: null, photo: null });
     const classes = listClassesRaw();
     const kb = {
       inline_keyboard: classes.map((c) => [{ text: c.title, callback_data: `awiz:cls:${c.id}` }]),
@@ -485,12 +499,24 @@ if (TELEGRAM_TOKEN) {
       });
     }
 
-    // Wizard: skip age
+    // Wizard: skip age → go to avatar picker
     if (ns === "awiz" && action === "age") {
       const state = addWizardState.get(chatId);
       if (!state || state.step !== "age")
         return bot.answerCallbackQuery(q.id, { text: t(q, "wizard_expired") });
       state.age = null;
+      state.step = "avatar";
+      addWizardState.set(chatId, state);
+      bot.answerCallbackQuery(q.id);
+      return sendAvatarPicker(q.message.chat.id, q);
+    }
+
+    // Wizard: emoji avatar selected (or skipped)
+    if (ns === "awiz" && action === "avatar") {
+      const state = addWizardState.get(chatId);
+      if (!state || state.step !== "avatar")
+        return bot.answerCallbackQuery(q.id, { text: t(q, "wizard_expired") });
+      state.photo = val === "skip" ? null : `emoji:${val}`;
       state.step = "confirm";
       addWizardState.set(chatId, state);
       bot.answerCallbackQuery(q.id);
@@ -623,9 +649,9 @@ if (TELEGRAM_TOKEN) {
         return bot.sendMessage(msg.chat.id, "❌ Age must be 10–99, or tap Skip.");
       }
       state.age = age;
-      state.step = "confirm";
+      state.step = "avatar";
       addWizardState.set(chatId, state);
-      return sendWizardConfirm(msg.chat.id, msg, state);
+      return sendAvatarPicker(msg.chat.id, msg);
     }
   });
 

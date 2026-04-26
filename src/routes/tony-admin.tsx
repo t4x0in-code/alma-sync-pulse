@@ -463,7 +463,11 @@ function EnrollmentRow({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-md border border-border/60 bg-background/30 p-2">
-      {e.photo ? (
+      {e.photo?.startsWith("emoji:") ? (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-2xl leading-none">
+          {e.photo.slice(6)}
+        </div>
+      ) : e.photo ? (
         <img src={e.photo} alt={e.name} className="h-10 w-10 rounded-full object-cover" />
       ) : (
         <div

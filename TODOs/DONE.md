@@ -5,6 +5,37 @@
 
 ---
 
+## 2026-04-25 (session 7 — emoji avatar picker)
+
+### TODO-0009 — Wizard emoji avatar picker
+**Closed:** 2026-04-25 · claude-sonnet-4-6
+
+**Problem:** No photo support in `/addwizard`. Real photo upload (Telegram getFile + HTTP download + base64) was too heavy. Need lightweight way to distinguish student faces.
+
+**Solution:** Emoji face picker as inline keyboard, stored as `emoji:<e>` in `photo` column.
+
+**Flow:** `age → avatar → confirm` (new step between age and confirm)
+
+**Emoji set (12 faces, 2 rows + Skip):**
+```
+Row 1: 🧑 👩 👨 👱 👱‍♀️ 🧔
+Row 2: 👩‍🦱 👩‍🦰 👩‍🦳 👨‍🦱 👨‍🦰 👨‍🦳
+```
+
+**Storage:** `"emoji:🧑"` in existing `photo` column. Prefix distinguishes from data URLs and https:// URLs. No schema change.
+
+**Frontend:** `EnrollmentRow` detects `photo.startsWith("emoji:")` → renders emoji in a 40×40 rounded circle with `text-2xl`. Existing `<img>` path unchanged.
+
+**Key patterns learned:**
+- Store with prefix (`emoji:`) not raw value — unambiguous to detect anywhere (frontend, future export, logs)
+- Emoji in Telegram callback_data works fine — multi-byte but well within 64-byte limit
+- Shared `sendAvatarPicker()` helper makes the step reusable if needed in other flows
+- `state.photo.slice(6)` to strip prefix in frontend — simpler than `.replace()`
+
+**Files:** `bot/src/server.js`, `bot/src/i18n.js`, `src/routes/tony-admin.tsx`, `tests/unit/wizard.test.ts`
+
+---
+
 ## 2026-04-25 (session 6 — wizard feedback + state guard)
 
 ### TODO-0008 — Wizard: silent state-loss + missing post-enroll list

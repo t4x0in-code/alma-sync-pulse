@@ -63,6 +63,7 @@ const DEFAULTS = {
   add_wizard_success: "✅ Enrolled! ID: #{id}",
   add_wizard_cancel: "❌ Enrollment cancelled.",
   add_wizard_skip_photo: "⏭️ Skip photo",
+  add_wizard_avatar: "🎭 Pick your avatar:",
   add_wizard_yes: "✅ Confirm",
   add_wizard_no: "❌ Cancel",
   add_wizard_skip: "⏭️ Skip",
