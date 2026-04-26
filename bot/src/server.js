@@ -309,8 +309,6 @@ if (TELEGRAM_TOKEN) {
   });
 
   bot.onText(/^\/status/, (msg) => {
-    const l = msg;
-    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
     const rows = listClasses();
     if (!rows.length) return bot.sendMessage(msg.chat.id, t(msg, "no_courses"));
     const txt = rows
@@ -344,7 +342,6 @@ if (TELEGRAM_TOKEN) {
   };
 
   bot.onText(/^\/list(?:\s+(\S+))?$/, (msg, m) => {
-    if (!guard(msg)) return;
     const classIdArg = m[1];
     const classes = listClassesRaw();
 
@@ -367,7 +364,6 @@ if (TELEGRAM_TOKEN) {
 
   // /add and /addwizard both launch the interactive wizard (TODO-0111)
   const launchAddWizard = (msg) => {
-    if (!isAdmin(msg)) return bot.sendMessage(msg.chat.id, t(msg, "no_access"));
     const chatId = String(msg.chat.id);
     addWizardState.set(chatId, { step: "class", classId: "", gender: "", name: "", age: null, photo: null });
     const classes = listClassesRaw();
@@ -592,7 +588,6 @@ if (TELEGRAM_TOKEN) {
   });
   // Wizard text input handler (name and age steps)
   bot.on("message", (msg) => {
-    if (!isAdmin(msg)) return;
     const chatId = String(msg.chat.id);
     const state = addWizardState.get(chatId);
     if (!state) return;

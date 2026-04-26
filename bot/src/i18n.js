@@ -11,7 +11,7 @@
 // ============================================================================
 const DEFAULTS = {
   start:
-    "🌹 *AlmaLatina Bot*\nYour chat ID: `{chatId}`\n\nAdd it to ADMIN\\_CHAT\\_IDS to enable commands.\n\n*Commands:*\n/status — class overview\n/list — enrollments\n/add — add student (wizard)\n/lang — change language",
+    "🌹 *AlmaLatina Bot*\nYour chat ID: `{chatId}`\n\n*Commands:*\n/status — class overview\n/list — who's coming\n/add — enroll yourself\n/lang — change language",
   no_access: "🚫 Access denied.",
   no_courses: "No courses.",
   status_line:
@@ -108,7 +108,7 @@ const DEFAULTS = {
 const OVERRIDES = {
   de: {
     start:
-      "🌹 *AlmaLatina Bot*\nDeine Chat-ID: `{chatId}`\n\nFüge sie zu ADMIN\\_CHAT\\_IDS hinzu, um Befehle zu nutzen.\n\n*Befehle:*\n/status — Kursübersicht\n/list — Anmeldungen\n/add — Schüler hinzufügen (Wizard)\n/lang — Sprache ändern",
+      "🌹 *AlmaLatina Bot*\nDeine Chat-ID: `{chatId}`\n\n*Befehle:*\n/status — Kursübersicht\n/list — wer kommt\n/add — selbst anmelden\n/lang — Sprache ändern",
     no_access: "🚫 Kein Zugriff.",
     no_courses: "Keine Kurse.",
     status_line:
@@ -153,7 +153,7 @@ const OVERRIDES = {
 
   ru: {
     start:
-      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\nДобавьте его в ADMIN\\_CHAT\\_IDS для доступа к командам.\n\n*Команды:*\n/status — обзор курсов\n/list — список заявок\n/add — добавить студента (мастер)\n/lang — изменить язык",
+      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\n*Команды:*\n/status — обзор курсов\n/list — кто придёт\n/add — записаться\n/lang — изменить язык",
     no_access: "🚫 Нет доступа.",
     no_courses: "Курсы не найдены.",
     status_line:
@@ -198,7 +198,7 @@ const OVERRIDES = {
 
   uk: {
     start:
-      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\nДодайте його до ADMIN\\_CHAT\\_IDS для доступу до команд.\n\n*Команди:*\n/status — огляд курсів\n/list — список заявок\n/add — додати студента (майстер)\n/lang — змінити мову",
+      "🌹 *AlmaLatina Bot*\nВаш Chat-ID: `{chatId}`\n\n*Команди:*\n/status — огляд курсів\n/list — хто прийде\n/add — записатися\n/lang — змінити мову",
     no_access: "🚫 Немає доступу.",
     no_courses: "Курси не знайдено.",
     status_line:
@@ -243,7 +243,7 @@ const OVERRIDES = {
 
   fr: {
     start:
-      "🌹 *AlmaLatina Bot*\nVotre Chat-ID: `{chatId}`\n\nAjoutez-le à ADMIN\\_CHAT\\_IDS pour utiliser les commandes.\n\n*Commandes:*\n/status — vue d'ensemble\n/list — inscriptions\n/add — ajouter un étudiant (assistant)\n/lang — changer de langue",
+      "🌹 *AlmaLatina Bot*\nVotre Chat-ID: `{chatId}`\n\n*Commandes:*\n/status — vue d'ensemble\n/list — qui vient\n/add — s'inscrire\n/lang — changer de langue",
     no_access: "🚫 Accès refusé.",
     no_courses: "Aucun cours.",
     status_line:
@@ -289,7 +289,7 @@ const OVERRIDES = {
 
   tr: {
     start:
-      "🌹 *AlmaLatina Bot*\nChat-ID'niz: `{chatId}`\n\nKomutları kullanmak için ADMIN\\_CHAT\\_IDS'e ekleyin.\n\n*Komutlar:*\n/status — genel bakış\n/list — kayıtlar\n/add — öğrenci ekle (sihirbaz)\n/lang — dili değiştir",
+      "🌹 *AlmaLatina Bot*\nChat-ID'niz: `{chatId}`\n\n*Komutlar:*\n/status — genel bakış\n/list — kim geliyor\n/add — kayıt ol\n/lang — dili değiştir",
     no_access: "🚫 Erişim reddedildi.",
     no_courses: "Kurs bulunamadı.",
     status_line:
@@ -334,7 +334,7 @@ const OVERRIDES = {
 
   it: {
     start:
-      "🌹 *AlmaLatina Bot*\nIl tuo Chat-ID: `{chatId}`\n\nAggiungilo ad ADMIN\\_CHAT\\_IDS per usare i comandi.\n\n*Comandi:*\n/status — panoramica\n/list — iscrizioni\n/add — aggiungi studente (procedura)\n/lang — cambia lingua",
+      "🌹 *AlmaLatina Bot*\nIl tuo Chat-ID: `{chatId}`\n\n*Comandi:*\n/status — panoramica\n/list — chi viene\n/add — iscriviti\n/lang — cambia lingua",
     no_access: "🚫 Accesso negato.",
     no_courses: "Nessun corso.",
     status_line:
@@ -379,7 +379,7 @@ const OVERRIDES = {
 
   es: {
     start:
-      "🌹 *AlmaLatina Bot*\nTu Chat-ID: `{chatId}`\n\nAñádelo a ADMIN\\_CHAT\\_IDS para usar los comandos.\n\n*Comandos:*\n/status — resumen\n/list — inscripciones\n/add — añadir estudiante (asistente)\n/lang — cambiar idioma",
+      "🌹 *AlmaLatina Bot*\nTu Chat-ID: `{chatId}`\n\n*Comandos:*\n/status — resumen\n/list — quién viene\n/add — inscribirse\n/lang — cambiar idioma",
     no_access: "🚫 Acceso denegado.",
     no_courses: "No hay cursos.",
     status_line:
