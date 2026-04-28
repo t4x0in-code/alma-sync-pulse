@@ -57,7 +57,7 @@ export function PWARegister() {
     if (!document.querySelector('link[rel="apple-touch-icon"]')) {
       const apple = document.createElement("link");
       apple.rel = "apple-touch-icon";
-      apple.href = "/icon-512.png";
+      apple.href = "/favicon.svg";
       document.head.appendChild(apple);
     }
 

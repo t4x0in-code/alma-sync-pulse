@@ -9,6 +9,10 @@
 
 - [ ] [TODO-0001](./TODO-0001-fix-failed-to-fetch-cors/) — CORS whitelist + network error handling
 - [ ] [TODO-0003](./TODO-0003-photo-size-validation/) — Strict photo size & MIME validation
+- [x] [TODO-0309](./TODO-0309-bot-add-flow-integration-test/) — Bot Add Flow Integration Test (Penalty, 2+ tests required)
+- [x] [TODO-0310](./TODO-0310-telegram-message-verification/) — Telegram Message Verification Test
+- [x] [TODO-0311](./TODO-0311-fe-admin-gender-fix-for-pairing/) — FE admin role edit to unblock pairing ✅
+- [ ] [TODO-0312](./TODO-0312-bot-add-access-policy/) — Bot `/add` access policy toggle (public vs admin_only)
 
 ## P1 — Required features / correctness
 

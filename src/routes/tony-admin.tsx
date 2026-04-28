@@ -28,16 +28,25 @@ const API_BASE = (import.meta.env.VITE_BOT_API_URL as string | undefined) ?? "";
 
 function TonyAdmin() {
   const { classes, live, reload } = useClasses(3000);
-  const [token, setToken] = useState(
-    () => (typeof window !== "undefined" && localStorage.getItem("admin_token")) || "",
-  );
+  const [token, setToken] = useState("");
   const [loginState, setLoginState] = useState<"idle" | "requesting" | "waiting" | "error">("idle");
   const [loginData, setLoginData] = useState<{ requestId: string; pin: string } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("admin_token");
+    if (stored) setToken(stored);
+  }, []);
+
   const saveToken = (t: string) => {
     setToken(t);
     if (typeof window !== "undefined") localStorage.setItem("admin_token", t);
+  };
+
+  const clearToken = () => {
+    setToken("");
+    if (typeof window !== "undefined") localStorage.removeItem("admin_token");
   };
 
   const requestLogin = async () => {
@@ -149,7 +158,13 @@ function TonyAdmin() {
 
         <div className="space-y-8">
           {classes.map((k) => (
-            <ClassAdmin key={k.id} klass={k} token={token} onChange={reload} />
+            <ClassAdmin
+              key={k.id}
+              klass={k}
+              token={token}
+              onChange={reload}
+              onUnauthorized={clearToken}
+            />
           ))}
         </div>
       </section>
@@ -163,10 +178,12 @@ function ClassAdmin({
   klass,
   token,
   onChange,
+  onUnauthorized,
 }: {
   klass: SalsaClass;
   token: string;
   onChange: () => void;
+  onUnauthorized: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [maxCap, setMaxCap] = useState(klass.max_capacity);
@@ -193,6 +210,11 @@ function ClassAdmin({
       toast.success(ok);
       onChange();
     } catch (e) {
+      if (e instanceof Error && e.message.startsWith("API 401:")) {
+        onUnauthorized();
+        toast.error("Session abgelaufen. Bitte erneut anmelden.");
+        return;
+      }
       toast.error(e instanceof Error ? e.message : "Fehler");
     } finally {
       setBusy(false);
@@ -372,6 +394,9 @@ function ClassAdmin({
               e={e}
               busy={busy}
               onDelete={() => wrap(() => api.admin.deleteEnrollment(e.id, token), "Entfernt")}
+              onSetGender={(gender) =>
+                wrap(() => api.admin.updateEnrollment(e.id, { gender }, token), "Rolle aktualisiert")
+              }
             />
           ))}
         </div>
@@ -456,11 +481,19 @@ function EnrollmentRow({
   e,
   busy,
   onDelete,
+  onSetGender,
 }: {
   e: Enrollment;
   busy: boolean;
   onDelete: () => void;
+  onSetGender: (gender: "L" | "F") => void;
 }) {
+  const [genderDraft, setGenderDraft] = useState<"L" | "F">(e.gender);
+
+  useEffect(() => {
+    setGenderDraft(e.gender);
+  }, [e.gender, e.id]);
+
   return (
     <div className="flex items-center gap-3 rounded-md border border-border/60 bg-background/30 p-2">
       {e.photo?.startsWith("emoji:") ? (
@@ -489,6 +522,26 @@ function EnrollmentRow({
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
           {e.source}
         </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <select
+          className="rounded-md border border-input bg-input px-2 py-1 text-xs"
+          value={genderDraft}
+          onChange={(ev) => setGenderDraft(ev.target.value as "L" | "F")}
+          disabled={busy}
+          aria-label={`Rolle für ${e.name}`}
+        >
+          <option value="L">🕺 L</option>
+          <option value="F">💃 F</option>
+        </select>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy || genderDraft === e.gender}
+          onClick={() => onSetGender(genderDraft)}
+        >
+          Rolle
+        </Button>
       </div>
       <Button size="sm" variant="outline" disabled={busy} onClick={onDelete}>
         <Trash2 className="h-3 w-3" />
