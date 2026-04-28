@@ -58,14 +58,16 @@ export function ClassCard({
   const soloFollowers = klass.enrollments.filter((e) => e.gender === "F" && !pairedIds.has(e.id));
 
   return (
-    <Card className="group overflow-hidden border-border/60 bg-card/60 p-6 backdrop-blur transition hover:border-primary/50 hover:shadow-glow">
+    <Card className="group overflow-hidden border-border/60 bg-card/60 p-4 backdrop-blur transition hover:border-primary/50 hover:shadow-glow sm:p-5 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <Badge variant="outline" className={s.className}>
             <span className="mr-2 h-1.5 w-1.5 rounded-full bg-current animate-pulse-dot" />
             {s.label}
           </Badge>
-          <h3 className="mt-3 font-display text-2xl md:text-3xl">{klass.title}</h3>
+          <h3 className="mt-2 font-display text-xl leading-tight sm:text-2xl md:mt-3 md:text-3xl">
+            {klass.title}
+          </h3>
           <p className="mt-1 text-sm text-muted-foreground">mit {klass.instructor}</p>
         </div>
         <a
@@ -79,7 +81,7 @@ export function ClassCard({
         </a>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-4 text-sm text-muted-foreground">
+      <div className="mt-3 flex flex-wrap gap-3 text-sm text-muted-foreground md:mt-4 md:gap-4">
         <span className="flex items-center gap-2">
           <Calendar className="h-4 w-4" />
           {klass.schedule}
@@ -91,7 +93,7 @@ export function ClassCard({
       </div>
 
       {/* Gender split */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-2 gap-2.5 md:mt-4 md:gap-3">
         <div className="rounded-md border border-border/60 bg-background/40 p-3">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">🕺 Leader</div>
           <div className="mt-1 font-display text-2xl">{leaders}</div>
@@ -103,10 +105,10 @@ export function ClassCard({
       </div>
 
       {klass.description && (
-        <p className="mt-4 text-sm text-muted-foreground">{klass.description}</p>
+        <p className="mt-3 text-sm text-muted-foreground md:mt-4">{klass.description}</p>
       )}
 
-      <div className="mt-5">
+      <div className="mt-4 md:mt-5">
         <div className="h-2 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full bg-gradient-fire transition-all duration-700"
@@ -118,7 +120,7 @@ export function ClassCard({
 
       {/* Pairs */}
       {(confirmed.length > 0 || proposed.length > 0) && (
-        <div className="mt-5 space-y-2">
+        <div className="mt-4 space-y-2 md:mt-5">
           <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
             <Heart className="h-3.5 w-3.5 text-primary" /> Paare
           </div>
@@ -129,7 +131,7 @@ export function ClassCard({
             return (
               <div
                 key={p.id}
-                className="flex items-center gap-3 rounded-md border border-success/30 bg-success/10 p-2"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-success/30 bg-success/10 p-2"
               >
                 <Avatar e={l} />
                 <span className="text-sm font-medium">{l.name}</span>
@@ -149,7 +151,7 @@ export function ClassCard({
             return (
               <div
                 key={p.id}
-                className="flex items-center gap-3 rounded-md border border-warning/30 bg-warning/5 p-2"
+                className="flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning/5 p-2"
               >
                 <Avatar e={l} />
                 <span className="text-sm">{l.name}</span>
@@ -209,13 +211,13 @@ export function ClassCard({
         </div>
       )}
 
-      <div className="mt-6 flex items-center gap-3">
+      <div className="mt-5 flex flex-col items-stretch gap-2 sm:mt-6 sm:flex-row sm:items-center sm:gap-3">
         <EnrollDialog klass={klass} />
         <a
           href={klass.external_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className="text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:text-left"
         >
           Details auf almalatina.de
         </a>

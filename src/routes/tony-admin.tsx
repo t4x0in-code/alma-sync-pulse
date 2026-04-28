@@ -142,16 +142,16 @@ function TonyAdmin() {
       <SiteHeader live={live} />
       <Toaster theme="dark" position="top-center" />
 
-      <section className="container mx-auto flex-1 px-4 py-10">
-        <div className="mb-8 flex items-end justify-between">
+      <section className="container mx-auto flex-1 px-4 py-5 sm:py-7 md:py-10">
+        <div className="mb-5 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <span className="text-xs uppercase tracking-widest text-primary">
               Tony · Coordinates
             </span>
-            <h1 className="mt-1 font-display text-4xl md:text-5xl">Admin Cockpit</h1>
+            <h1 className="mt-1 font-display text-3xl sm:text-4xl md:text-5xl">Admin Cockpit</h1>
             <p className="mt-1 text-sm text-muted-foreground">Synchronisiert mit Telegram-Bot.</p>
           </div>
-          <Button variant="outline" onClick={reload}>
+          <Button variant="outline" onClick={reload} className="w-full sm:w-auto">
             Refresh
           </Button>
         </div>
@@ -227,22 +227,22 @@ function ClassAdmin({
   });
 
   return (
-    <Card className="p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <Card className="p-4 sm:p-5 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
         <div>
-          <h2 className="font-display text-2xl">{klass.title}</h2>
+          <h2 className="font-display text-xl sm:text-2xl">{klass.title}</h2>
           <p className="text-sm text-muted-foreground">
             {klass.schedule} · {klass.current_enrollment}/{klass.max_capacity} ·{" "}
             <span className="text-primary">🕺 {klass.counts_by_gender.L}</span>{" "}
             <span className="text-accent-foreground">💃 {klass.counts_by_gender.F}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Input
             type="number"
             value={maxCap}
             onChange={(e) => setMaxCap(Number(e.target.value))}
-            className="w-24"
+            className="h-10 w-24"
           />
           <Button
             variant="outline"
@@ -276,7 +276,7 @@ function ClassAdmin({
       </div>
 
       {/* Pairs */}
-      <div className="mt-6">
+      <div className="mt-5 sm:mt-6">
         <h3 className="mb-2 flex items-center gap-2 text-sm uppercase tracking-widest text-muted-foreground">
           <Heart className="h-4 w-4 text-primary" /> Paare
         </h3>
@@ -308,9 +308,10 @@ function ClassAdmin({
                 </Badge>
                 <div className="ml-auto flex gap-1">
                   {!isConfirmed && (
-                    <Button
+                  <Button
                       size="sm"
                       variant="outline"
+                    className="h-9 px-3"
                       disabled={busy}
                       onClick={() =>
                         wrap(() => api.admin.setPairStatus(p.id, "confirmed", token), "Bestätigt")
@@ -322,6 +323,7 @@ function ClassAdmin({
                   <Button
                     size="sm"
                     variant="outline"
+                    className="h-9 px-3"
                     disabled={busy}
                     onClick={() => wrap(() => api.admin.deletePair(p.id, token), "Paar entfernt")}
                   >
@@ -337,7 +339,7 @@ function ClassAdmin({
         {freeLeaders.length > 0 && freeFollowers.length > 0 && (
           <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
             <select
-              className="rounded-md border border-input bg-input px-3 py-2 text-sm"
+              className="h-10 rounded-md border border-input bg-input px-3 py-2 text-sm"
               value={pairDraft.l ?? ""}
               onChange={(e) =>
                 setPairDraft({ ...pairDraft, l: e.target.value ? Number(e.target.value) : null })
@@ -352,7 +354,7 @@ function ClassAdmin({
               ))}
             </select>
             <select
-              className="rounded-md border border-input bg-input px-3 py-2 text-sm"
+              className="h-10 rounded-md border border-input bg-input px-3 py-2 text-sm"
               value={pairDraft.f ?? ""}
               onChange={(e) =>
                 setPairDraft({ ...pairDraft, f: e.target.value ? Number(e.target.value) : null })
@@ -368,7 +370,7 @@ function ClassAdmin({
             </select>
             <Button
               disabled={busy || !pairDraft.l || !pairDraft.f}
-              className="bg-gradient-fire"
+              className="h-10 bg-gradient-fire px-4"
               onClick={() =>
                 wrap(async () => {
                   await api.admin.createPair(pairDraft.l!, pairDraft.f!, token);
@@ -383,7 +385,7 @@ function ClassAdmin({
       </div>
 
       {/* Enrollments */}
-      <div className="mt-6">
+      <div className="mt-5 sm:mt-6">
         <h3 className="mb-2 text-sm uppercase tracking-widest text-muted-foreground">
           Anmeldungen ({klass.enrollments.length})
         </h3>
@@ -403,7 +405,7 @@ function ClassAdmin({
       </div>
 
       {/* Reserved */}
-      <div className="mt-6">
+      <div className="mt-5 sm:mt-6">
         <h3 className="mb-2 flex items-center gap-2 text-sm uppercase tracking-widest text-muted-foreground">
           <Lock className="h-4 w-4" /> Stammplätze
         </h3>
@@ -495,7 +497,7 @@ function EnrollmentRow({
   }, [e.gender, e.id]);
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-border/60 bg-background/30 p-2">
+      <div className="flex items-center gap-2 rounded-md border border-border/60 bg-background/30 p-2">
       {e.photo?.startsWith("emoji:") ? (
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-2xl leading-none">
           {e.photo.slice(6)}
@@ -543,7 +545,7 @@ function EnrollmentRow({
           Rolle
         </Button>
       </div>
-      <Button size="sm" variant="outline" disabled={busy} onClick={onDelete}>
+      <Button size="sm" variant="outline" className="h-9 w-9 p-0" disabled={busy} onClick={onDelete}>
         <Trash2 className="h-3 w-3" />
       </Button>
     </div>

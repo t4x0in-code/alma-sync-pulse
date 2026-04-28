@@ -40,17 +40,17 @@ function Index() {
           style={{ backgroundImage: `url(${heroImg})` }}
         />
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-background/40 via-background/80 to-background" />
-        <div className="container mx-auto px-4 py-20 md:py-32">
+        <div className="container mx-auto px-4 py-10 sm:py-14 md:py-24">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs uppercase tracking-widest text-primary">
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-dot" />
             Live Sync
           </span>
-          <h1 className="mt-6 font-display text-5xl leading-none tracking-wide md:text-7xl lg:text-8xl">
+          <h1 className="mt-4 font-display text-3xl leading-tight tracking-wide sm:text-4xl md:mt-6 md:text-6xl lg:text-7xl">
             Tanz das <span className="text-gradient-fire">Leben</span>
             <br />
             mit AlmaLatina
           </h1>
-          <p className="mt-6 max-w-xl text-lg text-muted-foreground">
+          <p className="mt-4 max-w-xl text-base text-muted-foreground md:mt-6 md:text-lg">
             Echtzeit-Verfügbarkeit für Tonys Salsa-Stunden. Sieh sofort, wie viele Plätze noch frei
             sind — direkt synchronisiert über Telegram.
           </p>
@@ -58,10 +58,10 @@ function Index() {
       </section>
 
       {/* Classes */}
-      <section className="container mx-auto px-4 pb-12">
-        <div className="mb-8 flex items-end justify-between">
+      <section className="container mx-auto px-4 pb-8 sm:pb-10 md:pb-12">
+        <div className="mb-5 flex items-end justify-between sm:mb-6 md:mb-8">
           <div>
-            <h2 className="font-display text-3xl md:text-4xl">Aktuelle Kurse</h2>
+            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl">Aktuelle Kurse</h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Updates alle 5 Sekunden vom Studio.
             </p>
@@ -74,7 +74,7 @@ function Index() {
           </button>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 sm:gap-5 md:grid-cols-2 md:gap-6">
           {classes.map((k) => (
             <ClassCard key={k.id} klass={k} />
           ))}
@@ -89,14 +89,13 @@ function Index() {
           </p>
         )}
 
-        <div className="mt-10 text-center text-xs text-muted-foreground">
+        <div className="mt-7 text-center text-xs text-muted-foreground sm:mt-8 md:mt-10">
           <Link to="/tony-admin" className="underline-offset-4 hover:text-primary hover:underline">
             Tony · Admin
           </Link>
         </div>
       </section>
 
-      <div className="flex-1" />
       <SiteFooter />
     </div>
   );
